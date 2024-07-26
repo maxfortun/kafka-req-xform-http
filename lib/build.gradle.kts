@@ -6,6 +6,11 @@
  * This project uses @Incubating APIs which are subject to change.
  */
 
+
+base {
+	archivesName.set("kafka-req-xform-http")
+}
+
 plugins {
     // Apply the java-library plugin for API and implementation separation.
     `java-library`

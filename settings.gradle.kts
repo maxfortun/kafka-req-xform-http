@@ -12,4 +12,5 @@ plugins {
 }
 
 rootProject.name = "kafka-req-xform-http"
+
 include("lib")
