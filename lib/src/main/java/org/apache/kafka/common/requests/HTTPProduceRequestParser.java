@@ -48,11 +48,16 @@ public class HTTPProduceRequestParser extends ProduceRequestParser {
 		try {
 			HttpRequest httpRequest = HttpRequest.newBuilder()
 				.uri(uri)
-				.POST(HttpRequest.BodyPublishers.noBody())
+				.POST(HttpRequest.BodyPublishers.ofByteArray(buffer.array()))
 				.build();
-			HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 
-        	return new ProduceRequest(new ProduceRequestData(new ByteBufferAccessor(buffer), version), version);
+			HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
+
+			byte[] body = httpResponse.body();
+			ByteBuffer responseBuffer = ByteBuffer.allocate(body.length);
+			responseBuffer.put(body);
+
+        	return new ProduceRequest(new ProduceRequestData(new ByteBufferAccessor(responseBuffer), version), version);
 		} catch(Exception e) {
 			String message = "Failed to parse request "+StandardCharsets.UTF_8.decode(buffer).toString();
 			throw new InvalidRequestException(message, e);
