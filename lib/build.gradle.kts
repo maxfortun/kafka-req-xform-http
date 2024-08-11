@@ -29,7 +29,7 @@ dependencies {
     // This dependency is used internally, and not exposed to consumers on their own compile classpath.
     implementation(libs.guava)
 
-	implementation("org.apache.kafka:kafka-clients:3.9.0-SNAPSHOT")
+	implementation("org.apache.kafka:kafka-clients:4.0.0-SNAPSHOT")
 	implementation("org.slf4j:slf4j-api:1.7.36")
 
 }
