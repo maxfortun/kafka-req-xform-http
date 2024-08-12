@@ -50,7 +50,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
     public HTTPProduceRequestDataTransformer(String transformerName) {
         this.transformerName = transformerName;
-        resources = ResourceBundle.getBundle("HTTPProduceRequestDataTransformer");
+        resources = ResourceBundle.getBundle(transformerName);
         uri = URI.create(resources.getString("uri"));
     }
 
