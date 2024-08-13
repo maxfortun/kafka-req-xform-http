@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
 
+import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.protocol.types.RawTaggedField;
 import org.apache.kafka.common.record.Record;
@@ -71,10 +72,10 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                         for(Header header : record.headers()) {
                             httpRequestBuilder.header(header.key(), LogUtils.toString(header.value()));
                         }
-						ByteBuffer bodyByteBuffer = record.value();
-						byte[] bodyArray = bodyByteBuffer.array();
-						int offset = bodyByteBuffer.arrayOffset();
-						int length = bodyArray.length - offset;
+                        ByteBuffer bodyByteBuffer = record.value();
+                        byte[] bodyArray = bodyByteBuffer.array();
+                        int offset = bodyByteBuffer.arrayOffset();
+                        int length = bodyArray.length - offset;
                         httpRequestBuilder.POST(HttpRequest.BodyPublishers.ofByteArray(bodyArray, offset, length));
 
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}]:\n{}  B:{}={}",
@@ -88,16 +89,20 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
         HttpRequest httpRequest = httpRequestBuilder.build();
         log.trace("{}: httpRequest {}", transformerName, httpRequest);
-/*
-            HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
 
+        try {
+            HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
+            log.trace("{}: httpResponse {}", transformerName, httpResponse);
+    
             byte[] body = httpResponse.body();
             ByteBuffer responseBuffer = ByteBuffer.allocate(body.length);
             responseBuffer.put(body);
-
-            return new ProduceRequest(new ProduceRequestData(new ByteBufferAccessor(responseBuffer), version), version);
-*/
-
-        return produceRequestData;
+    
+            log.trace("{}: responseBuffer {}", transformerName, responseBuffer);
+            // return new ProduceRequest(new ProduceRequestData(new ByteBufferAccessor(responseBuffer), version), version);
+            return produceRequestData;
+        } catch(Exception e) {
+            throw new InvalidRequestException(httpRequest.toString(), e);
+        }
     }
 }
