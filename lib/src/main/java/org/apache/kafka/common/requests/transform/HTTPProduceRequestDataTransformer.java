@@ -73,7 +73,9 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                         }
 						ByteBuffer bodyByteBuffer = record.value();
 						byte[] bodyArray = bodyByteBuffer.array();
-                        httpRequestBuilder.POST(HttpRequest.BodyPublishers.ofByteArray(bodyArray, bodyByteBuffer.arrayOffset(), bodyArray.length));
+						int offset = bodyByteBuffer.arrayOffset();
+						int length = bodyArray.length - offset;
+                        httpRequestBuilder.POST(HttpRequest.BodyPublishers.ofByteArray(bodyArray, offset, length));
 
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}]:\n{}  B:{}={}",
                             transformerName, batchId, recordId++,
