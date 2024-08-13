@@ -48,14 +48,14 @@ public class TransformingProduceRequestParser implements ProduceRequestParser {
             try {
                 String[] byteBufferTransformerNames = resources.getString("byteBufferTransformers").split("[\\s,;]+");
                 for (String byteBufferTransformerName : byteBufferTransformerNames) {
-                    byteBufferTransformers.add((ByteBufferTransformer) getTransformer("byteBufferTransformer." + byteBufferTransformerName));
+                    byteBufferTransformers.add((ByteBufferTransformer) getTransformer(byteBufferTransformerName));
                 }
             } catch(MissingResourceException mre) {}
 
             try {
                 String[] produceRequestDataTransformerNames = resources.getString("produceRequestDataTransformers").split("[\\s,;]+");
                 for (String produceRequestDataTransformerName : produceRequestDataTransformerNames) {
-                    produceRequestDataTransformers.add((ProduceRequestDataTransformer) getTransformer("produceRequestDataTransformer." + produceRequestDataTransformerName));
+                    produceRequestDataTransformers.add((ProduceRequestDataTransformer) getTransformer(produceRequestDataTransformerName));
                 }
             } catch(MissingResourceException mre) {}
         } catch (Exception e) {
