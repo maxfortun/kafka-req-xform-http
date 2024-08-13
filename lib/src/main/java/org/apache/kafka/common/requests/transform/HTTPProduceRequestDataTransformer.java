@@ -98,11 +98,13 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
             ByteBuffer responseBuffer = ByteBuffer.allocate(body.length);
             responseBuffer.put(body);
     
-            log.trace("{}: responseBuffer {}", transformerName, responseBuffer);
+            log.trace("{}: responseBuffer {}", transformerName, LogUtils.toString(responseBuffer));
             // return new ProduceRequest(new ProduceRequestData(new ByteBufferAccessor(responseBuffer), version), version);
-            return produceRequestData;
         } catch(Exception e) {
-            throw new InvalidRequestException(httpRequest.toString(), e);
+            log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
+            // throw new InvalidRequestException(httpRequest.toString(), e);
         }
+
+        return produceRequestData;
     }
 }
