@@ -44,15 +44,44 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
     private String transformerName;
 
-    private ResourceBundle resources;
+    private ResourceBundle resources = null;
 
     private HttpClient httpClient = HttpClient.newHttpClient();
     private URI uri;
 
     public HTTPProduceRequestDataTransformer(String transformerName) {
         this.transformerName = transformerName;
-        resources = ResourceBundle.getBundle(transformerName);
-        uri = URI.create(resources.getString("uri"));
+        uri = URI.create(getConfig("uri"));
+    }
+
+    private String getConfig(String key) {
+        String fullKey = transformerName+"-"+key;
+        String value = System.getProperty(fullKey);
+        if(null != value) {
+            log.trace("{}: getConfig prop {} = {}", transformerName, fullKey, value);
+            return value;
+        }
+        
+        fullKey = transformerName.replaceAll("[.-]", "_")+"_"+key;
+        value = System.getenv(fullKey);
+        if(null != value) {
+            log.trace("{}: getConfig env {} = {}", transformerName, fullKey, value);
+            return value;
+        }
+        
+        if(null == resources) {
+            resources = ResourceBundle.getBundle(transformerName);
+        }
+
+        fullKey = key;
+        value = resources.getString(key);
+        if(null != value) {
+            log.trace("{}: getConfig env {} = {}", transformerName, fullKey, value);
+            return value;
+        }
+
+        log.trace("{}: getConfig {} = null", transformerName, key);
+        return null;
     }
 
     public ProduceRequestData transform(ProduceRequestData produceRequestData, short version) {
