@@ -29,9 +29,8 @@ dependencies {
     // This dependency is used internally, and not exposed to consumers on their own compile classpath.
     implementation(libs.guava)
 
-	implementation("org.apache.kafka:kafka-clients:4.0.0-SNAPSHOT")
+	implementation("org.apache.kafka:kafka-clients:${System.getenv("KAFKA_VERSION")}")
 	implementation("org.slf4j:slf4j-api:1.7.36")
-
 }
 
 testing {
