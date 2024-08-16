@@ -84,29 +84,21 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         return null;
     }
 
-    public ProduceRequestData transform(ProduceRequestData produceRequestData, short version) {
-        for (RawTaggedField rawTaggedField : produceRequestData.unknownTaggedFields()) {
+    public ProduceRequestData transform(ProduceRequestData produceRequestDataIn, short version) {
+        ProduceRequestData produceRequestDataOut = produceRequestDataIn.duplicate();
+
+        for (RawTaggedField rawTaggedField : produceRequestDataOut.unknownTaggedFields()) {
             log.trace("{}: rawTaggedField {} = {}", transformerName, rawTaggedField.tag(), LogUtils.toString(rawTaggedField.data()));
         }
 
-        HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(uri);
-
-        for (ProduceRequestData.TopicProduceData topicProduceData : produceRequestData.topicData()) {
+        for (ProduceRequestData.TopicProduceData topicProduceData : produceRequestDataOut.topicData()) {
             for (ProduceRequestData.PartitionProduceData partitionProduceData : topicProduceData.partitionData()) {
                 int batchId = 0;
                 for (Iterator<? extends RecordBatch> iter = ((MemoryRecords)partitionProduceData.records()).batchIterator(); iter.hasNext(); batchId++) {
                     RecordBatch recordBatch = iter.next();
                     int recordId = 0;
                     for (Record record : recordBatch) {
-                        for(Header header : record.headers()) {
-                            httpRequestBuilder.header(header.key(), LogUtils.toString(header.value()));
-                        }
-                        ByteBuffer bodyByteBuffer = record.value();
-                        byte[] bodyArray = bodyByteBuffer.array();
-                        int offset = bodyByteBuffer.arrayOffset();
-                        int length = bodyArray.length - offset;
-                        httpRequestBuilder.POST(HttpRequest.BodyPublishers.ofByteArray(bodyArray, offset, length));
-
+                        transform(record, version);
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}]:\n{}  B:{}={}",
                             transformerName, batchId, recordId++,
                             LogUtils.toString(record.headers()), LogUtils.toString(record.key()), LogUtils.toString(record.value())
@@ -116,24 +108,45 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
             }
         }
 
+        return produceRequestDataOut;
+    }
+
+    // break the infinite loop breaker kafka -> lake -> kafka
+
+    private void transform(Record record, short version) {
+        HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(uri);
+
+        for(Header header : record.headers()) {
+            httpRequestBuilder.header(header.key(), LogUtils.toString(header.value()));
+        }
+
+        ByteBuffer bodyByteBuffer = record.value();
+        byte[] bodyArray = bodyByteBuffer.array();
+        int offset = bodyByteBuffer.arrayOffset();
+        int length = bodyArray.length - offset;
+        httpRequestBuilder.POST(HttpRequest.BodyPublishers.ofByteArray(bodyArray, offset, length));
+
         HttpRequest httpRequest = httpRequestBuilder.build();
         log.trace("{}: httpRequest {}", transformerName, httpRequest);
 
         try {
             HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
             log.trace("{}: httpResponse {}", transformerName, httpResponse);
-    
+             for(String name : httpResponse.headers().map().keySet()) {
+                String value = String.join(",", httpResponse.headers().allValues(name));
+                // record set header to value.get();
+            }
+
             byte[] body = httpResponse.body();
             ByteBuffer responseBuffer = ByteBuffer.allocate(body.length);
             responseBuffer.put(body);
     
             log.trace("{}: responseBuffer {}", transformerName, LogUtils.toString(responseBuffer));
-            // return new ProduceRequest(new ProduceRequestData(new ByteBufferAccessor(responseBuffer), version), version);
+            // record set key value
         } catch(Exception e) {
             log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
             // throw new InvalidRequestException(httpRequest.toString(), e);
         }
-
-        return produceRequestData;
     }
 }
+
