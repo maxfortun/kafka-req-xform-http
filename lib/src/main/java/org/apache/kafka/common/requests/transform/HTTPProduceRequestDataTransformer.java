@@ -134,7 +134,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         bodyByteBuffer.rewind();
         int length = bodyByteBuffer.remaining();  // Correctly set the length to the remaining bytes in the buffer
         byte[] bodyArray = new byte[length];
-        log.trace("{}: LENGTH {}", transformerName, length);
+        log.trace("{}: bodyByteBuffer length {}", transformerName, length);
 
         bodyByteBuffer.get(bodyArray, 0, length);  // Correctly extract the intended value
 
