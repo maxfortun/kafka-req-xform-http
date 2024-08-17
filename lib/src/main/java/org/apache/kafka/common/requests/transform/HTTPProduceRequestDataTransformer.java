@@ -123,6 +123,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         // read the record.value as a byte buffer
         ByteBuffer bodyByteBuffer = record.value();
         log.trace("{}: bodyByteBuffer {}", transformerName, LogUtils.toString(bodyByteBuffer));
+
 //        byte[] bodyArray = bodyByteBuffer.array();
 //        int offset = bodyByteBuffer.arrayOffset();
 //        int length = bodyArray.length - offset;
