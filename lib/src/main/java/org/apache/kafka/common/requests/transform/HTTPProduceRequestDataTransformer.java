@@ -124,6 +124,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         byte[] bodyArray = bodyByteBuffer.array();
         int offset = bodyByteBuffer.arrayOffset();
         int length = bodyArray.length - offset;
+        log.trace("{}: LENGTH {}", transformerName, length);
         httpRequestBuilder.POST(HttpRequest.BodyPublishers.ofByteArray(bodyArray, offset, length));
 
         HttpRequest httpRequest = httpRequestBuilder.build();
