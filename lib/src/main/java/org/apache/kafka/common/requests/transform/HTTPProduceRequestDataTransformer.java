@@ -130,6 +130,8 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
 
 //        int offset = bodyByteBuffer.position();
+        //why is the length always 0?
+        bodyByteBuffer.rewind();
         int length = bodyByteBuffer.remaining();  // Correctly set the length to the remaining bytes in the buffer
         byte[] bodyArray = new byte[length];
         log.trace("{}: LENGTH {}", transformerName, length);
