@@ -121,11 +121,24 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         }
 
         ByteBuffer bodyByteBuffer = record.value();
-        byte[] bodyArray = bodyByteBuffer.array();
-        int offset = bodyByteBuffer.arrayOffset();
-        int length = bodyArray.length - offset;
+        log.trace("{}: bodyByteBuffer {}", transformerName, LogUtils.toString(bodyByteBuffer));
+//        byte[] bodyArray = bodyByteBuffer.array();
+//        int offset = bodyByteBuffer.arrayOffset();
+//        int length = bodyArray.length - offset;
+//        log.trace("{}: LENGTH {}", transformerName, length);
+//        httpRequestBuilder.POST(HttpRequest.BodyPublishers.ofByteArray(bodyArray, offset, length));
+
+
+//        int offset = bodyByteBuffer.position();
+        int length = bodyByteBuffer.remaining();  // Correctly set the length to the remaining bytes in the buffer
+        byte[] bodyArray = new byte[length];
         log.trace("{}: LENGTH {}", transformerName, length);
-        httpRequestBuilder.POST(HttpRequest.BodyPublishers.ofByteArray(bodyArray, offset, length));
+
+        bodyByteBuffer.get(bodyArray, 0, length);  // Correctly extract the intended value
+
+        log.trace("{}: bodyByteBuffer {}", transformerName, LogUtils.toString(bodyByteBuffer));
+
+        httpRequestBuilder.POST(HttpRequest.BodyPublishers.ofByteArray(bodyArray, 0, length));
 
         HttpRequest httpRequest = httpRequestBuilder.build();
         log.trace("{}: httpRequest {}", transformerName, httpRequest);
