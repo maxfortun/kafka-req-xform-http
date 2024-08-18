@@ -94,7 +94,11 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         for (ProduceRequestData.TopicProduceData topicProduceData : produceRequestDataOut.topicData()) {
             for (ProduceRequestData.PartitionProduceData partitionProduceData : topicProduceData.partitionData()) {
                 int batchId = 0;
-                for (Iterator<? extends RecordBatch> iter = ((MemoryRecords)partitionProduceData.records()).batchIterator(); iter.hasNext(); batchId++) {
+
+                // may need to create new records here
+
+                MemoryRecords memoryRecords = (MemoryRecords)partitionProduceData.records();
+                for (Iterator<? extends RecordBatch> iter = memoryRecords.batchIterator(); iter.hasNext(); batchId++) {
                     RecordBatch recordBatch = iter.next();
                     int recordId = 0;
                     for (Record record : recordBatch) {
