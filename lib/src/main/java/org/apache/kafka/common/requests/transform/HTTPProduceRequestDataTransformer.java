@@ -128,7 +128,9 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         byte[] bodyArray = bodyByteBuffer.array();
         int offset = bodyByteBuffer.arrayOffset();
         int length = bodyArray.length - offset;
-        httpRequestBuilder.POST(HttpRequest.BodyPublishers.ofByteArray(bodyArray, offset, length));
+		HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.ofByteArray(bodyArray, offset, length);
+        log.trace("{}: bodyPublisher {}", transformerName, bodyPublisher);
+        httpRequestBuilder.POST(bodyPublisher);
 
         HttpRequest httpRequest = httpRequestBuilder.build();
         log.trace("{}: httpRequest {}", transformerName, httpRequest);
@@ -136,7 +138,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         try {
             HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
             log.trace("{}: httpResponse {}", transformerName, httpResponse);
-             for(String name : httpResponse.headers().map().keySet()) {
+            for(String name : httpResponse.headers().map().keySet()) {
                 String value = String.join(",", httpResponse.headers().allValues(name));
                 // record set header to value.get();
             }
