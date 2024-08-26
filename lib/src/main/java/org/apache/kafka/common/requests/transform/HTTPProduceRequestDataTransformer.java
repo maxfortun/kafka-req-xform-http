@@ -121,22 +121,22 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(uri);
 
         for(Header header : record.headers()) {
-			String key = header.key();
-			String value = LogUtils.toString(header.value());
-        	log.trace("{}: header {} {}", transformerName, key, value);
+            String key = header.key();
+            String value = LogUtils.toString(header.value());
+            log.trace("{}: req header {}={}", transformerName, key, value);
             httpRequestBuilder.header(key, value);
         }
 
         ByteBuffer bodyByteBuffer = record.value();
-		int position = bodyByteBuffer.position();
-		int arrayOffset = bodyByteBuffer.arrayOffset();
-        log.trace("{}: bodyByteBuffer {} {} {}", transformerName, position, arrayOffset, bodyByteBuffer.array());
+        int position = bodyByteBuffer.position();
+        int arrayOffset = bodyByteBuffer.arrayOffset();
+        log.trace("{}: req bodyByteBuffer {} {} {}", transformerName, position, arrayOffset, bodyByteBuffer.array());
 
         byte[] bodyArray = new byte[bodyByteBuffer.remaining()];
-		bodyByteBuffer.get(bodyArray, 0, bodyArray.length); 
-        log.trace("{}: bodyArray {} {} {}", transformerName, bodyArray.length, bodyArray, new String(bodyArray, StandardCharsets.UTF_8));
+        bodyByteBuffer.get(bodyArray, 0, bodyArray.length); 
+        log.trace("{}: req bodyArray {} {} {}", transformerName, bodyArray.length, bodyArray, new String(bodyArray, StandardCharsets.UTF_8));
 
-		HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.ofByteArray(bodyArray);
+        HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.ofByteArray(bodyArray);
         log.trace("{}: bodyPublisher {}", transformerName, bodyPublisher);
         httpRequestBuilder.POST(bodyPublisher);
 
@@ -148,6 +148,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
             log.trace("{}: httpResponse {}", transformerName, httpResponse);
             for(String name : httpResponse.headers().map().keySet()) {
                 String value = String.join(",", httpResponse.headers().allValues(name));
+                log.trace("{}: res header {}={}", transformerName, name, value);
                 // record set header to value.get();
             }
 
