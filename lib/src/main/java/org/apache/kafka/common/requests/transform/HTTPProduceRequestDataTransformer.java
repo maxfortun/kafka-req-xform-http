@@ -103,8 +103,8 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                     int recordId = 0;
                     for (Record record : recordBatch) {
                         transform(record, version);
-                        log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}]:\n{}  B:{}={}",
-                            transformerName, batchId, recordId++,
+                        log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}]:\n{}\n{}  B:{}={}",
+                            transformerName, batchId, recordId++, record,
                             LogUtils.toString(record.headers()), LogUtils.toString(record.key()), LogUtils.toString(record.value())
                         );
                     }
