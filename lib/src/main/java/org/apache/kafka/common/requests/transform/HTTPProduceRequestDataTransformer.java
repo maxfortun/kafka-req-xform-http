@@ -128,8 +128,9 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         }
 
         ByteBuffer bodyByteBuffer = record.value();
+
         byte[] bodyArray = new byte[bodyByteBuffer.remaining()];
-		bodyByteBuffer.get(bodyArray, bodyByteBuffer.arrayOffset(), bodyArray.length); 
+		bodyByteBuffer.get(bodyArray, 0, bodyArray.length); 
         log.trace("{}: bodyArray {} {} {}", transformerName, bodyArray.length, bodyArray, new String(bodyArray, StandardCharsets.UTF_8));
 
 		HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.ofByteArray(bodyArray);
