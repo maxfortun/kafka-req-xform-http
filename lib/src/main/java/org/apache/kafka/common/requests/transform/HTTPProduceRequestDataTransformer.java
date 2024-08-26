@@ -121,16 +121,18 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(uri);
 
         for(Header header : record.headers()) {
-            httpRequestBuilder.header(header.key(), LogUtils.toString(header.value()));
+			String key = header.key();
+			String value = LogUtils.toString(header.value());
+        	log.trace("{}: header {} {}", transformerName, key, value);
+            httpRequestBuilder.header(key, value);
         }
 
         ByteBuffer bodyByteBuffer = record.value();
-        byte[] bodyArray = bodyByteBuffer.array();
-        int offset = bodyByteBuffer.arrayOffset();
-        int length = bodyArray.length - offset;
-        log.trace("{}: bodyArray {} {} {}", transformerName, offset, length, new String(bodyArray, offset, length, StandardCharsets.UTF_8));
+        byte[] bodyArray = new byte[bodyByteBuffer.remaining()];
+		bodyByteBuffer.get(bodyArray, bodyByteBuffer.arrayOffset(), bodyArray.length); 
+        log.trace("{}: bodyArray {} {}", transformerName, bodyArray.length, new String(bodyArray, StandardCharsets.UTF_8));
 
-		HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.ofByteArray(bodyArray, offset, length);
+		HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.ofByteArray(bodyArray);
         log.trace("{}: bodyPublisher {}", transformerName, bodyPublisher);
         httpRequestBuilder.POST(bodyPublisher);
 
