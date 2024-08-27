@@ -17,24 +17,32 @@
 package org.apache.kafka.common.requests.transform;
 
 import java.util.ResourceBundle;
+import java.util.Set;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
-import java.util.Iterator;
+import java.io.DataOutputStream;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
 
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.protocol.types.RawTaggedField;
+import org.apache.kafka.common.record.DefaultRecord;
+import org.apache.kafka.common.record.SimpleRecord;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.Records;
 import org.apache.kafka.common.record.MemoryRecords;
+import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
+import org.apache.kafka.common.utils.ByteBufferInputStream;
+import org.apache.kafka.common.utils.ByteBufferOutputStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,7 +111,9 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
                     int recordId = 0;
                     for (Record record : recordBatch) {
-                        transform(record, version);
+
+                        Record transformedRecord = transform(recordBatch, record, version);
+
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}]:\n{}\n{}  B:{}={}",
                             transformerName, batchId, recordId, record,
                             LogUtils.toString(record.headers()), LogUtils.toString(record.key()), LogUtils.toString(record.value())
@@ -114,6 +124,8 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
                     batchId++;
                 }
+
+                // partitionProduceData.setRecords(transformedMemoryRecords);
             }
         }
 
@@ -122,7 +134,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
     // break the infinite loop breaker kafka -> lake -> kafka
 
-    private void transform(Record record, short version) {
+    private Record transform(RecordBatch recordBatch, Record record, short version) {
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(uri);
 
         for(Header header : record.headers()) {
@@ -151,21 +163,43 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         try {
             HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
             log.trace("{}: httpResponse {}", transformerName, httpResponse);
-            for(String name : httpResponse.headers().map().keySet()) {
-                String value = String.join(",", httpResponse.headers().allValues(name));
-                log.trace("{}: res header {}={}", transformerName, name, value);
-                // record set header to value.get();
+            Set<String> keys = httpResponse.headers().map().keySet();
+            Header[] headers = new Header[keys.size()];
+            int headerId = 0;
+            for(String key : keys) {
+                String value = String.join(",", httpResponse.headers().allValues(key));
+                log.trace("{}: res header {}={}", transformerName, key, value);
+                headers[headerId++] = new RecordHeader(key, value.getBytes());
             }
 
-            byte[] body = httpResponse.body();
-            ByteBuffer responseBuffer = ByteBuffer.allocate(body.length);
-            responseBuffer.put(body);
-    
-            log.trace("{}: responseBuffer {}", transformerName, LogUtils.toString(responseBuffer));
-            // record set key value
+            ByteBufferOutputStream out = new ByteBufferOutputStream(1024);
+            DefaultRecord.writeTo(
+                    new DataOutputStream(out),
+                    (int)record.offset(),
+                    record.timestamp(),
+                    record.key(),
+                    ByteBuffer.wrap(httpResponse.body()),
+                    headers
+            );
+            ByteBuffer buffer = out.buffer();
+            buffer.flip();
+        
+			long timestamp = recordBatch.timestampType() == TimestampType.LOG_APPEND_TIME ?
+                recordBatch.maxTimestamp() : RecordBatch.NO_TIMESTAMP;
+
+            DefaultRecord transformedRecord = DefaultRecord.readFrom(
+				buffer,
+				recordBatch.baseOffset(),
+				timestamp,
+				recordBatch.baseSequence(),
+				null
+			);
+
+            return transformedRecord;
         } catch(Exception e) {
             log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
             // throw new InvalidRequestException(httpRequest.toString(), e);
+            return null;
         }
     }
 }
