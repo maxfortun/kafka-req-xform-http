@@ -195,6 +195,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 				null
 			);
 
+            log.trace("{}: transformedRecord {}", transformerName, transformedRecord);
             return transformedRecord;
         } catch(Exception e) {
             log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
