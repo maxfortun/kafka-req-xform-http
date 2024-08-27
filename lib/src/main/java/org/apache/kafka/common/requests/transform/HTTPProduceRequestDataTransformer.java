@@ -172,13 +172,16 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                 headers[headerId++] = new RecordHeader(key, value.getBytes());
             }
 
+			byte[] body = httpResponse.body();
+			log.trace("{}: res body {} {}", transformerName, body.length, body);
+
             ByteBufferOutputStream out = new ByteBufferOutputStream(1024);
             DefaultRecord.writeTo(
                     new DataOutputStream(out),
                     (int)record.offset(),
                     record.timestamp(),
                     record.key(),
-                    ByteBuffer.wrap(httpResponse.body()),
+                    ByteBuffer.wrap(body),
                     headers
             );
             ByteBuffer buffer = out.buffer();
