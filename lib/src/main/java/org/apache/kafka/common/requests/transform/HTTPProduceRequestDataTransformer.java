@@ -98,9 +98,9 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                 // may need to create new records here
 
                 MemoryRecords memoryRecords = (MemoryRecords)partitionProduceData.records();
-                for (Iterator<? extends RecordBatch> iter = memoryRecords.batchIterator(); iter.hasNext(); batchId++) {
-                    RecordBatch recordBatch = iter.next();
+                for (RecordBatch recordBatch : memoryRecords.batches()) {
                     int recordId = 0;
+
                     for (Record record : recordBatch) {
                         transform(record, version);
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}]:\n{}\n{}  B:{}={}",
