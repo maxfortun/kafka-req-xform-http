@@ -123,9 +123,14 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                         Record transformedRecord = transform(recordBatch, record, version);
 						memoryRecordsBuilder.append(transformedRecord);
 
-                        log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}]:\n{}\n{}  B:{}={}",
+                        log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
                             transformerName, batchId, recordId, record,
                             LogUtils.toString(record.headers()), LogUtils.toString(record.key()), LogUtils.toString(record.value())
+                        );
+
+                        log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] out:\n{}\n{}  B:{}={}",
+                            transformerName, batchId, recordId, transformedRecord,
+                            LogUtils.toString(transformedRecord.headers()), LogUtils.toString(transformedRecord.key()), LogUtils.toString(transformedRecord.value())
                         );
 
                         recordId++;
@@ -182,7 +187,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
             }
 
 			byte[] body = httpResponse.body();
-			log.trace("{}: res body {} {}", transformerName, body.length, body);
+			log.trace("{}: res body {} {}", transformerName, body.length, body, new String(body, StandardCharsets.UTF_8) );
 
             ByteBufferOutputStream out = new ByteBufferOutputStream(1024);
             DefaultRecord.writeTo(
