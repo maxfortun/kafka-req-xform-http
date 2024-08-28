@@ -61,6 +61,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
     private HttpClient httpClient = HttpClient.newHttpClient();
     private URI uri;
     private final String onHttpExceptionConfig;
+    private final String topicNamePattern;
 
     public HTTPProduceRequestDataTransformer(String transformerName) {
         this.transformerName = transformerName;
@@ -71,6 +72,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         //   pass-thru:  return the response as-is
         //   original:   return the original request
         onHttpExceptionConfig = getConfig("onHttpException", "fail");
+        topicNamePattern = getConfig("topicNamePattern");
     }
 
     private String getConfig(String key, String defaultValue) {
@@ -123,6 +125,12 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         }
 
         for (ProduceRequestData.TopicProduceData topicProduceData : produceRequestDataOut.topicData()) {
+
+            if(null != topicNamePattern && !topicProduceData.name().matches(topicNamePattern)) {
+                log.trace("{}: topicNamePattern {} != {}", transformerName, topicProduceData.name(), topicNamePattern);
+                continue;
+            }
+
             for (ProduceRequestData.PartitionProduceData partitionProduceData : topicProduceData.partitionData()) {
 
                 MemoryRecords memoryRecords = (MemoryRecords)partitionProduceData.records();
@@ -166,8 +174,6 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
         return produceRequestDataOut;
     }
-
-    // break the infinite loop breaker kafka -> lake -> kafka
 
     private static Header lastHeader(Record record, String key) {
         Optional<Header> optional = Arrays.stream(record.headers())
