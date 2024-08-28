@@ -240,23 +240,21 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
             return transformedRecord;
         } catch(HttpResponseException e) {
             log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
+            if(proceedOnHttpException) {
+                return record;
+            }
+
+            Header proceedOnHttpExceptionHeader = lastHeader(record, transformerName+"-proceedOnHttpException");
             if(
-                proceedOnHttpException
-                || Boolean.parseBoolean(
-                    new String(
-                        lastHeader(record, transformerName+"-proceedOnHttpException").value(),
-                        StandardCharsets.UTF_8
-                    )
-                )
+                null != proceedOnHttpExceptionHeader
+                && Boolean.parseBoolean( new String(proceedOnHttpExceptionHeader.value(), StandardCharsets.UTF_8) )
             ) {
                 return record;
             }
-            // throw new InvalidRequestException(httpRequest.toString(), e);
-            return null;
+            throw new InvalidRequestException(httpRequest.toString(), e);
         } catch(Exception e) {
             log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
-            // throw new InvalidRequestException(httpRequest.toString(), e);
-            return null;
+            throw new InvalidRequestException(httpRequest.toString(), e);
         }
     }
 }
