@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractProduceRequestDataTransformer implements ProduceRequestDataTransformer {
     public static final Logger log = LoggerFactory.getLogger(AbstractProduceRequestDataTransformer.class);
 
-    private String transformerName;
+    protected String transformerName;
 
     private ResourceBundle resources = null;
 

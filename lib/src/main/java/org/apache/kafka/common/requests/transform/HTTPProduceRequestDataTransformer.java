@@ -51,21 +51,16 @@ import org.apache.kafka.common.utils.ByteBufferOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTransformer {
+public class HTTPProduceRequestDataTransformer extends AbstractProduceRequestDataTransformer {
     public static final Logger log = LoggerFactory.getLogger(HTTPProduceRequestDataTransformer.class);
-
-    private String transformerName;
-
-    private ResourceBundle resources = null;
 
     private HttpClient httpClient = HttpClient.newHttpClient();
     private URI uri;
     private final String onHttpExceptionConfig;
-    private final String topicNamePattern;
     private final String httpHeaderPrefix;
 
     public HTTPProduceRequestDataTransformer(String transformerName) {
-        this.transformerName = transformerName;
+		super(transformerName);
         uri = URI.create(getConfig("uri"));
 
         // Valid values:
@@ -73,123 +68,10 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         //   pass-thru:  return the response as-is
         //   original:   return the original request
         onHttpExceptionConfig = getConfig("onHttpException", "fail");
-        topicNamePattern = getConfig("topicNamePattern");
         httpHeaderPrefix = getConfig("httpHeaderPrefix", transformerName+"-");
     }
 
-    private String getConfig(String key, String defaultValue) {
-        String value = getConfig(key);
-        if(null != value) {
-            return value;
-        }
-        return defaultValue;
-    }
-
-    private String getConfig(String key) {
-        String fullKey = transformerName+"-"+key;
-        String value = System.getProperty(fullKey);
-        if(null != value) {
-            log.trace("{}: getConfig prop {} = {}", transformerName, fullKey, value);
-            return value;
-        }
-        
-        fullKey = transformerName.replaceAll("[.-]", "_")+"_"+key;
-        value = System.getenv(fullKey);
-        if(null != value) {
-            log.trace("{}: getConfig env {} = {}", transformerName, fullKey, value);
-            return value;
-        }
-        
-        try {
-            if(null == resources) {
-                resources = ResourceBundle.getBundle(transformerName);
-            }
-
-            fullKey = key;
-            value = resources.getString(key);
-        } catch(Exception e) {
-        }
-
-        if(null != value) {
-            log.trace("{}: getConfig bundle {} = {}", transformerName, fullKey, value);
-            return value;
-        }
-
-        log.trace("{}: getConfig {} = null", transformerName, key);
-        return null;
-    }
-
-    public ProduceRequestData transform(ProduceRequestData produceRequestDataIn, short version) {
-        ProduceRequestData produceRequestDataOut = produceRequestDataIn.duplicate();
-
-        for (RawTaggedField rawTaggedField : produceRequestDataOut.unknownTaggedFields()) {
-            log.trace("{}: rawTaggedField {} = {}", transformerName, rawTaggedField.tag(), LogUtils.toString(rawTaggedField.data()));
-        }
-
-        for (ProduceRequestData.TopicProduceData topicProduceData : produceRequestDataOut.topicData()) {
-
-            if(null != topicNamePattern && !topicProduceData.name().matches(topicNamePattern)) {
-                log.trace("{}: topicNamePattern {} != {}", transformerName, topicProduceData.name(), topicNamePattern);
-                continue;
-            }
-
-            for (ProduceRequestData.PartitionProduceData partitionProduceData : topicProduceData.partitionData()) {
-
-                MemoryRecords memoryRecords = (MemoryRecords)partitionProduceData.records();
-
-                MemoryRecordsBuilder memoryRecordsBuilder = MemoryRecords.builder(
-                    ByteBuffer.allocate(memoryRecords.sizeInBytes()),
-                    CompressionType.NONE,
-                    TimestampType.CREATE_TIME,
-                    0L
-                );
-
-
-                int batchId = 0;
-                for (RecordBatch recordBatch : memoryRecords.batches()) {
-
-                    int recordId = 0;
-                    for (Record record : recordBatch) {
-
-                        Record transformedRecord = transform(topicProduceData, partitionProduceData, recordBatch, record, version);
-                        memoryRecordsBuilder.append(transformedRecord);
-
-                        log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
-                            transformerName, batchId, recordId, record,
-                            LogUtils.toString(record.headers()), LogUtils.toString(record.key()), LogUtils.toString(record.value())
-                        );
-
-                        log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] out:\n{}\n{}  B:{}={}",
-                            transformerName, batchId, recordId, transformedRecord,
-                            LogUtils.toString(transformedRecord.headers()), LogUtils.toString(transformedRecord.key()), LogUtils.toString(transformedRecord.value())
-                        );
-
-                        recordId++;
-                    }
-
-                    batchId++;
-                }
-
-                partitionProduceData.setRecords(memoryRecordsBuilder.build());
-            }
-        }
-
-        return produceRequestDataOut;
-    }
-
-    private static Header lastHeader(Record record, String key) {
-        Optional<Header> optional = Arrays.stream(record.headers())
-                                   .filter(header -> key.equals(header.key()))
-                                   .reduce((a, b) -> b);
-
-        if(optional.isPresent()) {
-            return optional.get();//get it from optional
-        }
-
-        return null;
-    }
-
-    private Record transform(
+    protected Record transform(
         ProduceRequestData.TopicProduceData topicProduceData,
         ProduceRequestData.PartitionProduceData partitionProduceData,
         RecordBatch recordBatch,
@@ -246,43 +128,10 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                 }
             }
 
-            Set<String> keys = httpResponse.headers().map().keySet();
-            Header[] headers = new Header[keys.size()];
-            int headerId = 0;
-            for(String key : keys) {
-                String value = String.join(",", httpResponse.headers().allValues(key));
-                log.trace("{}: res header {}={}", transformerName, key, value);
-                headers[headerId++] = new RecordHeader(key, value.getBytes());
-            }
-
+			Header[] headers = headers(httpResponse.headers().map());
             byte[] body = httpResponse.body();
             log.trace("{}: res body {} {}", transformerName, body.length, body, new String(body, StandardCharsets.UTF_8) );
-
-            ByteBufferOutputStream out = new ByteBufferOutputStream(1024);
-            DefaultRecord.writeTo(
-                    new DataOutputStream(out),
-                    (int)record.offset(),
-                    record.timestamp(),
-                    record.key(),
-                    ByteBuffer.wrap(body),
-                    headers
-            );
-            ByteBuffer buffer = out.buffer();
-            buffer.flip();
-        
-            long timestamp = recordBatch.timestampType() == TimestampType.LOG_APPEND_TIME ?
-                recordBatch.maxTimestamp() : RecordBatch.NO_TIMESTAMP;
-
-            DefaultRecord transformedRecord = DefaultRecord.readFrom(
-                buffer,
-                recordBatch.baseOffset(),
-                timestamp,
-                recordBatch.baseSequence(),
-                null
-            );
-
-            log.trace("{}: transformedRecord {}", transformerName, transformedRecord);
-            return transformedRecord;
+			return newRecord(recordBatch, record, headers, body);
         } catch(Exception e) {
             log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
             throw new InvalidRequestException(httpRequest.toString(), e);
