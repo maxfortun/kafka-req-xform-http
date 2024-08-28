@@ -60,12 +60,25 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
     private HttpClient httpClient = HttpClient.newHttpClient();
     private URI uri;
-    private boolean proceedOnHttpException;
+    private final String onHttpExceptionConfig;
 
     public HTTPProduceRequestDataTransformer(String transformerName) {
         this.transformerName = transformerName;
         uri = URI.create(getConfig("uri"));
-        proceedOnHttpException = Boolean.parseBoolean(getConfig("proceedOnHttpException"));
+
+        // Valid values:
+        //   fail:       fail the request
+        //   pass-thru:  return the response as-is
+        //   original:   return the original request
+        onHttpExceptionConfig = getConfig("onHttpException", "fail");
+    }
+
+    private String getConfig(String key, String defaultValue) {
+        String value = getConfig(key);
+        if(null != value) {
+            return value;
+        }
+        return defaultValue;
     }
 
     private String getConfig(String key) {
@@ -198,7 +211,20 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
             HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
             log.trace("{}: httpResponse {}", transformerName, httpResponse);
             if(httpResponse.statusCode() != 200) {
-                throw new HttpResponseException(httpResponse);
+
+                String onHttpException = onHttpExceptionConfig;
+                Header onHttpExceptionHeader = lastHeader(record, transformerName+"-onHttpException");
+                if(null != onHttpExceptionHeader) {
+                    onHttpException = new String(onHttpExceptionHeader.value(), StandardCharsets.UTF_8);
+                }
+    
+                if("original".equalsIgnoreCase(onHttpException)) {
+                    return record;
+                }
+    
+                if(!"pass-thru".equalsIgnoreCase(onHttpException)) {
+                    throw new HttpResponseException(httpResponse);
+                }
             }
 
             Set<String> keys = httpResponse.headers().map().keySet();
@@ -238,20 +264,6 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
             log.trace("{}: transformedRecord {}", transformerName, transformedRecord);
             return transformedRecord;
-        } catch(HttpResponseException e) {
-            log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
-            if(proceedOnHttpException) {
-                return record;
-            }
-
-            Header proceedOnHttpExceptionHeader = lastHeader(record, transformerName+"-proceedOnHttpException");
-            if(
-                null != proceedOnHttpExceptionHeader
-                && Boolean.parseBoolean( new String(proceedOnHttpExceptionHeader.value(), StandardCharsets.UTF_8) )
-            ) {
-                return record;
-            }
-            throw new InvalidRequestException(httpRequest.toString(), e);
         } catch(Exception e) {
             log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
             throw new InvalidRequestException(httpRequest.toString(), e);
