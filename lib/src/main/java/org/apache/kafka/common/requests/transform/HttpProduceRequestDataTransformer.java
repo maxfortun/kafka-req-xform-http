@@ -51,15 +51,15 @@ import org.apache.kafka.common.utils.ByteBufferOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HTTPProduceRequestDataTransformer extends AbstractProduceRequestDataTransformer {
-    public static final Logger log = LoggerFactory.getLogger(HTTPProduceRequestDataTransformer.class);
+public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDataTransformer {
+    public static final Logger log = LoggerFactory.getLogger(HttpProduceRequestDataTransformer.class);
 
     private HttpClient httpClient = HttpClient.newHttpClient();
     private URI uri;
     private final String onHttpExceptionConfig;
     private final String httpHeaderPrefix;
 
-    public HTTPProduceRequestDataTransformer(String transformerName) {
+    public HttpProduceRequestDataTransformer(String transformerName) {
 		super(transformerName);
         uri = URI.create(getConfig("uri"));
 
