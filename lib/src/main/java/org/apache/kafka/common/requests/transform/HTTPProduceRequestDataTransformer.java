@@ -16,8 +16,10 @@
  */
 package org.apache.kafka.common.requests.transform;
 
+import java.util.Arrays;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.Optional;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -58,10 +60,12 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
     private HttpClient httpClient = HttpClient.newHttpClient();
     private URI uri;
+    private boolean proceedOnHttpException;
 
     public HTTPProduceRequestDataTransformer(String transformerName) {
         this.transformerName = transformerName;
         uri = URI.create(getConfig("uri"));
+        proceedOnHttpException = Boolean.parseBoolean(getConfig("proceedOnHttpException"));
     }
 
     private String getConfig(String key) {
@@ -148,6 +152,18 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
     // break the infinite loop breaker kafka -> lake -> kafka
 
+    private static Header lastHeader(Record record, String key) {
+        Optional<Header> optional = Arrays.stream(record.headers())
+                                   .filter(header -> key.equals(header.key()))
+                                   .reduce((a, b) -> b);
+
+        if(optional.isPresent()) {
+            return optional.get();//get it from optional
+        }
+
+        return null;
+    }
+
     private Record transform(RecordBatch recordBatch, Record record, short version) {
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(uri);
 
@@ -178,7 +194,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
             HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
             log.trace("{}: httpResponse {}", transformerName, httpResponse);
             if(httpResponse.statusCode() != 200) {
-				throw new HttpResponseException(httpResponse);
+                throw new HttpResponseException(httpResponse);
             }
 
             Set<String> keys = httpResponse.headers().map().keySet();
@@ -218,6 +234,21 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
             log.trace("{}: transformedRecord {}", transformerName, transformedRecord);
             return transformedRecord;
+        } catch(HttpResponseException e) {
+            log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
+            if(
+                proceedOnHttpException
+                || Boolean.parseBoolean(
+                    new String(
+                        lastHeader(record, transformerName+"-proceedOnHttpException").value(),
+                        StandardCharsets.UTF_8
+                    )
+                )
+            ) {
+                return record;
+            }
+            // throw new InvalidRequestException(httpRequest.toString(), e);
+            return null;
         } catch(Exception e) {
             log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
             // throw new InvalidRequestException(httpRequest.toString(), e);
