@@ -170,7 +170,7 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
                                    .reduce((a, b) -> b);
 
         if(optional.isPresent()) {
-            return optional.get();//get it from optional
+            return optional.get();
         }
 
         return null;
