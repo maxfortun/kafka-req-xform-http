@@ -106,12 +106,12 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
 
                 MemoryRecords memoryRecords = (MemoryRecords)partitionProduceData.records();
 
-				MemoryRecordsBuilder memoryRecordsBuilder = MemoryRecords.builder(
-					ByteBuffer.allocate(memoryRecords.sizeInBytes()),
+                MemoryRecordsBuilder memoryRecordsBuilder = MemoryRecords.builder(
+                    ByteBuffer.allocate(memoryRecords.sizeInBytes()),
                     CompressionType.NONE,
                     TimestampType.CREATE_TIME,
                     0L
-				);
+                );
 
 
                 int batchId = 0;
@@ -121,7 +121,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                     for (Record record : recordBatch) {
 
                         Record transformedRecord = transform(recordBatch, record, version);
-						memoryRecordsBuilder.append(transformedRecord);
+                        memoryRecordsBuilder.append(transformedRecord);
 
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
                             transformerName, batchId, recordId, record,
@@ -177,6 +177,10 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         try {
             HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
             log.trace("{}: httpResponse {}", transformerName, httpResponse);
+            if(httpResponse.statusCode() != 200) {
+				throw new HttpResponseException(httpResponse);
+            }
+
             Set<String> keys = httpResponse.headers().map().keySet();
             Header[] headers = new Header[keys.size()];
             int headerId = 0;
@@ -186,8 +190,8 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                 headers[headerId++] = new RecordHeader(key, value.getBytes());
             }
 
-			byte[] body = httpResponse.body();
-			log.trace("{}: res body {} {}", transformerName, body.length, body, new String(body, StandardCharsets.UTF_8) );
+            byte[] body = httpResponse.body();
+            log.trace("{}: res body {} {}", transformerName, body.length, body, new String(body, StandardCharsets.UTF_8) );
 
             ByteBufferOutputStream out = new ByteBufferOutputStream(1024);
             DefaultRecord.writeTo(
@@ -201,16 +205,16 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
             ByteBuffer buffer = out.buffer();
             buffer.flip();
         
-			long timestamp = recordBatch.timestampType() == TimestampType.LOG_APPEND_TIME ?
+            long timestamp = recordBatch.timestampType() == TimestampType.LOG_APPEND_TIME ?
                 recordBatch.maxTimestamp() : RecordBatch.NO_TIMESTAMP;
 
             DefaultRecord transformedRecord = DefaultRecord.readFrom(
-				buffer,
-				recordBatch.baseOffset(),
-				timestamp,
-				recordBatch.baseSequence(),
-				null
-			);
+                buffer,
+                recordBatch.baseOffset(),
+                timestamp,
+                recordBatch.baseSequence(),
+                null
+            );
 
             log.trace("{}: transformedRecord {}", transformerName, transformedRecord);
             return transformedRecord;
