@@ -62,6 +62,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
     private URI uri;
     private final String onHttpExceptionConfig;
     private final String topicNamePattern;
+    private final String httpHeaderPrefix;
 
     public HTTPProduceRequestDataTransformer(String transformerName) {
         this.transformerName = transformerName;
@@ -73,6 +74,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         //   original:   return the original request
         onHttpExceptionConfig = getConfig("onHttpException", "fail");
         topicNamePattern = getConfig("topicNamePattern");
+        httpHeaderPrefix = getConfig("httpHeaderPrefix", transformerName+"-");
     }
 
     private String getConfig(String key, String defaultValue) {
@@ -149,7 +151,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                     int recordId = 0;
                     for (Record record : recordBatch) {
 
-                        Record transformedRecord = transform(recordBatch, record, version);
+                        Record transformedRecord = transform(topicProduceData, partitionProduceData, recordBatch, record, version);
                         memoryRecordsBuilder.append(transformedRecord);
 
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
@@ -187,15 +189,26 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         return null;
     }
 
-    private Record transform(RecordBatch recordBatch, Record record, short version) {
+    private Record transform(
+        ProduceRequestData.TopicProduceData topicProduceData,
+        ProduceRequestData.PartitionProduceData partitionProduceData,
+        RecordBatch recordBatch,
+        Record record,
+        short version
+    ) {
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(uri);
 
         for(Header header : record.headers()) {
             String key = header.key();
+			if(key.matches("(?i)^"+httpHeaderPrefix)) {
+            	log.trace("{}: req header {} skipped, because it starts with the http header prefix {}", transformerName, key, httpHeaderPrefix);
+				continue;
+			}
             String value = LogUtils.toString(header.value());
-            log.trace("{}: req header {}={}", transformerName, key, value);
+            log.trace("{}: req header added {}={}", transformerName, key, value);
             httpRequestBuilder.header(key, value);
         }
+        httpRequestBuilder.header(httpHeaderPrefix+"topic-name", topicProduceData.name());
 
         ByteBuffer bodyByteBuffer = record.value();
         int position = bodyByteBuffer.position();
