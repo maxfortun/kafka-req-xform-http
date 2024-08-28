@@ -32,12 +32,14 @@ import java.nio.ByteBuffer;
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.protocol.types.RawTaggedField;
+import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.DefaultRecord;
 import org.apache.kafka.common.record.SimpleRecord;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.Records;
 import org.apache.kafka.common.record.MemoryRecords;
+import org.apache.kafka.common.record.MemoryRecordsBuilder;
 import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -102,9 +104,15 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
         for (ProduceRequestData.TopicProduceData topicProduceData : produceRequestDataOut.topicData()) {
             for (ProduceRequestData.PartitionProduceData partitionProduceData : topicProduceData.partitionData()) {
 
-                // may need to create new records here
-
                 MemoryRecords memoryRecords = (MemoryRecords)partitionProduceData.records();
+
+				MemoryRecordsBuilder memoryRecordsBuilder = MemoryRecords.builder(
+					ByteBuffer.allocate(memoryRecords.sizeInBytes()),
+                    CompressionType.NONE,
+                    TimestampType.CREATE_TIME,
+                    0L
+				);
+
 
                 int batchId = 0;
                 for (RecordBatch recordBatch : memoryRecords.batches()) {
@@ -113,6 +121,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                     for (Record record : recordBatch) {
 
                         Record transformedRecord = transform(recordBatch, record, version);
+						memoryRecordsBuilder.append(transformedRecord);
 
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}]:\n{}\n{}  B:{}={}",
                             transformerName, batchId, recordId, record,
@@ -125,7 +134,7 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
                     batchId++;
                 }
 
-                // partitionProduceData.setRecords(transformedMemoryRecords);
+                partitionProduceData.setRecords(memoryRecordsBuilder.build());
             }
         }
 
