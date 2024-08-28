@@ -83,14 +83,18 @@ public class HTTPProduceRequestDataTransformer implements ProduceRequestDataTran
             return value;
         }
         
-        if(null == resources) {
-            resources = ResourceBundle.getBundle(transformerName);
+        try {
+            if(null == resources) {
+                resources = ResourceBundle.getBundle(transformerName);
+            }
+
+            fullKey = key;
+            value = resources.getString(key);
+        } catch(Exception e) {
         }
 
-        fullKey = key;
-        value = resources.getString(key);
         if(null != value) {
-            log.trace("{}: getConfig env {} = {}", transformerName, fullKey, value);
+            log.trace("{}: getConfig bundle {} = {}", transformerName, fullKey, value);
             return value;
         }
 
