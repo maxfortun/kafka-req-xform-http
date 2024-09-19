@@ -31,6 +31,8 @@ import java.io.DataOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
 
+import java.time.Duration;
+
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.protocol.types.RawTaggedField;
@@ -56,12 +58,17 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
     private HttpClient httpClient = HttpClient.newHttpClient();
     private URI uri;
+    private Duration requestTimeout;
     private final String onHttpExceptionConfig;
     private final String httpHeaderPrefix;
 
     public HttpProduceRequestDataTransformer(String transformerName) {
-		super(transformerName);
+        super(transformerName);
         uri = URI.create(getConfig("uri"));
+        String requestTimeoutString = getConfig("requestTimeout");
+        if(null != requestTimeoutString) {
+            requestTimeout = Duration.parse(requestTimeoutString);
+        }
 
         // Valid values:
         //   fail:       fail the request
@@ -79,13 +86,16 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         short version
     ) {
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(uri);
+        if(null != requestTimeout) {
+            httpRequestBuilder.timeout(requestTimeout);
+        }
 
         for(Header header : record.headers()) {
             String key = header.key();
-			if(key.matches("(?i)^"+httpHeaderPrefix)) {
-            	log.trace("{}: req header {} skipped, because it starts with the http header prefix {}", transformerName, key, httpHeaderPrefix);
-				continue;
-			}
+            if(key.matches("(?i)^"+httpHeaderPrefix)) {
+                log.trace("{}: req header {} skipped, because it starts with the http header prefix {}", transformerName, key, httpHeaderPrefix);
+                continue;
+            }
             String value = LogUtils.toString(header.value());
             log.trace("{}: req header added {}={}", transformerName, key, value);
             httpRequestBuilder.header(key, value);
@@ -128,10 +138,10 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 }
             }
 
-			Header[] headers = headers(httpResponse.headers().map());
+            Header[] headers = headers(httpResponse.headers().map());
             byte[] body = httpResponse.body();
             log.trace("{}: res body {} {}", transformerName, body.length, body, new String(body, StandardCharsets.UTF_8) );
-			return newRecord(recordBatch, record, headers, body);
+            return newRecord(recordBatch, record, headers, body);
         } catch(Exception e) {
             log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
             throw new InvalidRequestException(httpRequest.toString(), e);
