@@ -16,33 +16,33 @@
  */
 package org.apache.kafka.common.requests.transform;
 
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
-import java.util.Optional;
-import java.util.Map;
-import java.util.List;
-
-import java.io.IOException;
-import java.io.DataOutputStream;
-
-import java.nio.charset.StandardCharsets;
-import java.nio.ByteBuffer;
 
 import org.apache.kafka.common.errors.InvalidRequestException;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.protocol.types.RawTaggedField;
 import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.DefaultRecord;
-import org.apache.kafka.common.record.SimpleRecord;
+import org.apache.kafka.common.record.MemoryRecords;
+import org.apache.kafka.common.record.MemoryRecordsBuilder;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.Records;
-import org.apache.kafka.common.record.MemoryRecords;
-import org.apache.kafka.common.record.MemoryRecordsBuilder;
+import org.apache.kafka.common.record.SimpleRecord;
 import org.apache.kafka.common.record.TimestampType;
-import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.utils.ByteBufferInputStream;
 import org.apache.kafka.common.utils.ByteBufferOutputStream;
 

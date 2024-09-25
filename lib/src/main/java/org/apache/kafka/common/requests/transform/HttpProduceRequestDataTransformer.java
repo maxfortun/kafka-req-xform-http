@@ -16,37 +16,40 @@
  */
 package org.apache.kafka.common.requests.transform;
 
-import java.util.Arrays;
-import java.util.ResourceBundle;
-import java.util.Set;
-import java.util.Optional;
+import java.io.DataOutputStream;
 
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.URI;
 
-import java.io.DataOutputStream;
-
-import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 import java.time.Duration;
 
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.ResourceBundle;
+import java.util.Set;
+
 import org.apache.kafka.common.errors.InvalidRequestException;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.protocol.types.RawTaggedField;
 import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.DefaultRecord;
-import org.apache.kafka.common.record.SimpleRecord;
+import org.apache.kafka.common.record.MemoryRecords;
+import org.apache.kafka.common.record.MemoryRecordsBuilder;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.Records;
-import org.apache.kafka.common.record.MemoryRecords;
-import org.apache.kafka.common.record.MemoryRecordsBuilder;
+import org.apache.kafka.common.record.SimpleRecord;
 import org.apache.kafka.common.record.TimestampType;
-import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.utils.ByteBufferInputStream;
 import org.apache.kafka.common.utils.ByteBufferOutputStream;
 
@@ -100,7 +103,9 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             log.trace("{}: req header added {}={}", transformerName, key, value);
             httpRequestBuilder.header(key, value);
         }
+
         httpRequestBuilder.header(httpHeaderPrefix+"topic-name", topicProduceData.name());
+        httpRequestBuilder.header(httpHeaderPrefix+"http-start-time", ""+(new Date()).getTime());
 
         ByteBuffer bodyByteBuffer = record.value();
         int position = bodyByteBuffer.position();
@@ -138,9 +143,15 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 }
             }
 
-            Header[] headers = headers(httpResponse.headers().map());
+			Map<String, List<String>> headersMap = httpResponse.headers().map();
+
+            Header[] headers = headers(headersMap);
+            headersMap.put(httpHeaderPrefix+"http-end-time", Arrays.asList(""+(new Date()).getTime()));
+
             byte[] body = httpResponse.body();
+
             log.trace("{}: res body {} {}", transformerName, body.length, body, new String(body, StandardCharsets.UTF_8) );
+
             return newRecord(recordBatch, record, headers, body);
         } catch(Exception e) {
             log.debug("{}: httpRequest {}", transformerName, httpRequest, e);

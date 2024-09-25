@@ -16,17 +16,18 @@
  */
 package org.apache.kafka.common.requests.transform;
 
-import java.util.Iterator;
-import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
+import java.util.Iterator;
+
+import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.protocol.types.RawTaggedField;
+import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.Records;
-import org.apache.kafka.common.record.MemoryRecords;
-import org.apache.kafka.common.header.Header;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

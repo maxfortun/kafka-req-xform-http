@@ -19,10 +19,10 @@ package org.apache.kafka.common.requests.transform;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
+import org.apache.kafka.common.requests.RequestHeader;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.kafka.common.requests.RequestHeader;
 
 public class NOOPByteBufferTransformer implements ByteBufferTransformer {
     public static final Logger log = LoggerFactory.getLogger(NOOPByteBufferTransformer.class);
