@@ -105,7 +105,8 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
 
         httpRequestBuilder.header(httpHeaderPrefix+"topic-name", topicProduceData.name());
-        httpRequestBuilder.header(httpHeaderPrefix+"http-start-time", ""+(new Date()).getTime());
+		Date httpStartTime = new Date();
+        httpRequestBuilder.header(httpHeaderPrefix+"req-time", ""+httpStartTime.getTime());
 
         ByteBuffer bodyByteBuffer = record.value();
         int position = bodyByteBuffer.position();
@@ -146,7 +147,8 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 			Map<String, List<String>> headersMap = httpResponse.headers().map();
 
             Header[] headers = headers(headersMap);
-            headersMap.put(httpHeaderPrefix+"http-end-time", Arrays.asList(""+(new Date()).getTime()));
+            headersMap.put(httpHeaderPrefix+"req-time", Arrays.asList(""+httpStartTime.getTime()));
+            headersMap.put(httpHeaderPrefix+"res-time", Arrays.asList(""+(new Date()).getTime()));
 
             byte[] body = httpResponse.body();
 
