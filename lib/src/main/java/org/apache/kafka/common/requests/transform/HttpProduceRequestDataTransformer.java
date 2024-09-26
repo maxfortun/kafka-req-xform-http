@@ -30,6 +30,7 @@ import java.time.Duration;
 
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -144,11 +145,12 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 }
             }
 
-			Map<String, List<String>> headersMap = httpResponse.headers().map();
+			Map<String, List<String>> headersMap = new HashMap<>(httpResponse.headers().map());
 
-            Header[] headers = headers(headersMap);
             headersMap.put(httpHeaderPrefix+"req-time", Arrays.asList(""+reqTime.getTime()));
             headersMap.put(httpHeaderPrefix+"res-time", Arrays.asList(""+(new Date()).getTime()));
+
+            Header[] headers = headers(headersMap);
 
             byte[] body = httpResponse.body();
 
