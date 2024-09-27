@@ -81,7 +81,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         //   original:   return the original request
         onHttpExceptionConfig = getConfig("onHttpException", "fail");
         httpHeaderPrefix = getConfig("httpHeaderPrefix", transformerName+"-");
-        brokerHostname = System.getProperty("HOSTNAME"); 
+        brokerHostname = System.getenv("HOSTNAME"); 
     }
 
     protected Record transform(
