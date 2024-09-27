@@ -44,3 +44,6 @@ testing {
     }
 }
 
+task("copyDependencies", Copy::class) {
+	from(configurations.runtimeClasspath).into("dependencies")
+}
