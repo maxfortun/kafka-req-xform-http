@@ -65,6 +65,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
     private Duration requestTimeout;
     private final String onHttpExceptionConfig;
     private final String httpHeaderPrefix;
+    private final String brokerHostname;
 
     public HttpProduceRequestDataTransformer(String transformerName) {
         super(transformerName);
@@ -80,6 +81,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         //   original:   return the original request
         onHttpExceptionConfig = getConfig("onHttpException", "fail");
         httpHeaderPrefix = getConfig("httpHeaderPrefix", transformerName+"-");
+        brokerHostname = System.getProperty("HOSTNAME"); 
     }
 
     protected Record transform(
@@ -105,7 +107,8 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             httpRequestBuilder.header(key, value);
         }
 
-        httpRequestBuilder.header(httpHeaderPrefix+"topic-name", topicProduceData.name());
+        httpRequestBuilder.header(httpHeaderPrefix+"broker-hostname", brokerHostname);
+        httpRequestBuilder.header(httpHeaderPrefix+"broker-topic-name", topicProduceData.name());
         Date reqDate = new Date();
         httpRequestBuilder.header(httpHeaderPrefix+"broker-req-time", ""+reqDate.getTime());
 
@@ -150,6 +153,10 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
             Map<String, List<String>> headersMap = new HashMap<>(httpResponse.headers().map());
 
+            // Broker headers should never be returned by the called service.
+            headersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(httpHeaderPrefix+"broker-"));
+
+            headersMap.put(httpHeaderPrefix+"broker-hostname", Arrays.asList(brokerHostname));
             headersMap.put(httpHeaderPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
             headersMap.put(httpHeaderPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
             headersMap.put(httpHeaderPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
