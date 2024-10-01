@@ -39,7 +39,7 @@ import java.util.Set;
 
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.header.internals.RecordHeader;
+import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.protocol.types.RawTaggedField;
 import org.apache.kafka.common.record.CompressionType;
@@ -84,13 +84,35 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         brokerHostname = System.getenv("HOSTNAME"); 
     }
 
+    protected boolean shouldBypass(RecordHeaders recordHeaders) {
+        String shouldBypassKey = httpHeaderPrefix+"-broker-bypass";
+        Header shouldBypassHeader = recordHeaders.lastHeader(shouldBypassKey);
+        if(null == shouldBypassHeader) {
+            return false;
+        }
+
+        String shouldBypassValue = LogUtils.toString(shouldBypassHeader.value());
+        Boolean shouldBypassBool = Boolean.parseBoolean(shouldBypassValue);
+        if(shouldBypassBool) {
+            log.trace("{}: Bypassing record. Header {} is {}.", transformerName, shouldBypassKey, shouldBypassValue);
+        }
+
+        return shouldBypassBool;
+    }
+
     protected Record transform(
         ProduceRequestData.TopicProduceData topicProduceData,
         ProduceRequestData.PartitionProduceData partitionProduceData,
         RecordBatch recordBatch,
         Record record,
+        RecordHeaders recordHeaders,
         short version
     ) {
+
+        if(shouldBypass(recordHeaders)) {
+            return record;
+        }
+
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(uri);
         if(null != requestTimeout) {
             httpRequestBuilder.timeout(requestTimeout);

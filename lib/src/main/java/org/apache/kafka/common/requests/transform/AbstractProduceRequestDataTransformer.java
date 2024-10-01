@@ -32,6 +32,7 @@ import java.util.Set;
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
+import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.protocol.types.RawTaggedField;
 import org.apache.kafka.common.record.CompressionType;
@@ -138,7 +139,7 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
                     int recordId = 0;
                     for (Record record : recordBatch) {
 
-                        Record transformedRecord = transform(topicProduceData, partitionProduceData, recordBatch, record, version);
+                        Record transformedRecord = transform(topicProduceData, partitionProduceData, recordBatch, record, new RecordHeaders(record.headers()), version);
                         memoryRecordsBuilder.append(transformedRecord);
 
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
@@ -181,10 +182,11 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
         ProduceRequestData.PartitionProduceData partitionProduceData,
         RecordBatch recordBatch,
         Record record,
+        RecordHeaders recordHeaders,
         short version
     );
 
-	protected Header[] headers(Map<String, List<String>> map) {
+    protected Header[] headers(Map<String, List<String>> map) {
         Set<String> keys = map.keySet();
         Header[] headers = new Header[keys.size()];
         int headerId = 0;
@@ -193,10 +195,10 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
             log.trace("{}: header {}={}", transformerName, key, value);
             headers[headerId++] = new RecordHeader(key, value.getBytes());
         }
-		return headers;
-	}
+        return headers;
+    }
 
-	protected Record newRecord(RecordBatch recordBatch, Record record, Header[] headers, byte[] body) throws IOException {
+    protected Record newRecord(RecordBatch recordBatch, Record record, Header[] headers, byte[] body) throws IOException {
         ByteBufferOutputStream out = new ByteBufferOutputStream(1024);
         DefaultRecord.writeTo(
             new DataOutputStream(out),
