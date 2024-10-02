@@ -94,7 +94,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         String shouldBypassValue = Utils.utf8(shouldBypassHeader.value());
         Boolean shouldBypassBool = Boolean.parseBoolean(shouldBypassValue);
         if(shouldBypassBool) {
-            log.trace("{}: Bypassing record. Header {} is {}.", transformerName, shouldBypassKey, shouldBypassValue);
+            log.debug("{}: Bypassing record. Header {} is {}.", transformerName, shouldBypassKey, shouldBypassValue);
         }
 
         return shouldBypassBool;
@@ -121,11 +121,11 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         for(Header header : record.headers()) {
             String key = header.key();
             if(key.matches("(?i)^"+httpHeaderPrefix)) {
-                log.trace("{}: req header {} skipped, because it starts with the http header prefix {}", transformerName, key, httpHeaderPrefix);
+                log.debug("{}: req header {} skipped, because it starts with the http header prefix {}", transformerName, key, httpHeaderPrefix);
                 continue;
             }
             String value = Utils.utf8(header.value());
-            log.trace("{}: req header added {}={}", transformerName, key, value);
+            log.debug("{}: req header added {}={}", transformerName, key, value);
             httpRequestBuilder.header(key, value);
         }
 
@@ -147,7 +147,8 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
         byte[] bodyArray = new byte[bodyByteBuffer.remaining()];
         bodyByteBuffer.get(bodyArray, 0, bodyArray.length); 
-        log.trace("{}: req bodyArray {} {} {}", transformerName, bodyArray.length, bodyArray, new String(bodyArray, StandardCharsets.UTF_8));
+        log.trace("{}: req bodyArray {} {}", transformerName, bodyArray.length, bodyArray);
+        log.debug("{}: req bodyArray String {} {}", transformerName, bodyArray.length, new String(bodyArray, StandardCharsets.UTF_8));
 
         HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.ofByteArray(bodyArray);
         log.trace("{}: bodyPublisher {}", transformerName, bodyPublisher);
@@ -157,11 +158,11 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         httpRequestBuilder.header(httpHeaderPrefix+"broker-req-time", ""+reqDate.getTime());
 
         HttpRequest httpRequest = httpRequestBuilder.build();
-        log.trace("{}: httpRequest {}", transformerName, httpRequest);
+        log.debug("{}: httpRequest {}", transformerName, httpRequest);
 
         try {
             HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
-            log.trace("{}: httpResponse {}", transformerName, httpResponse);
+            log.debug("{}: httpResponse {}", transformerName, httpResponse);
             if(httpResponse.statusCode() != 200) {
 
                 String onHttpException = onHttpExceptionConfig;
@@ -196,7 +197,8 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
             byte[] body = httpResponse.body();
 
-            log.trace("{}: res body {} {}", transformerName, body.length, body, new String(body, StandardCharsets.UTF_8) );
+            log.trace("{}: res body {}", transformerName, body.length, body);
+            log.debug("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
 
             return newRecord(recordBatch, record, headers, body);
         } catch(Exception e) {

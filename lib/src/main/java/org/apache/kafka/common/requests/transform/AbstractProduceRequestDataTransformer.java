@@ -111,13 +111,13 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
         ProduceRequestData produceRequestDataOut = produceRequestDataIn.duplicate();
 
         for (RawTaggedField rawTaggedField : produceRequestDataOut.unknownTaggedFields()) {
-            log.trace("{}: rawTaggedField {} = {}", transformerName, rawTaggedField.tag(), Utils.utf8(rawTaggedField.data()));
+            log.debug("{}: rawTaggedField {} = {}", transformerName, rawTaggedField.tag(), Utils.utf8(rawTaggedField.data()));
         }
 
         for (ProduceRequestData.TopicProduceData topicProduceData : produceRequestDataOut.topicData()) {
 
             if(null != topicNamePattern && !topicProduceData.name().matches(topicNamePattern)) {
-                log.trace("{}: topicNamePattern {} != {}", transformerName, topicProduceData.name(), topicNamePattern);
+                log.debug("{}: topicNamePattern {} != {}", transformerName, topicProduceData.name(), topicNamePattern);
                 continue;
             }
 
@@ -142,12 +142,12 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
                         Record transformedRecord = transform(topicProduceData, partitionProduceData, recordBatch, record, new RecordHeaders(record.headers()), version);
                         memoryRecordsBuilder.append(transformedRecord);
 
-                        log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
+                        log.debug("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
                             transformerName, batchId, recordId, record,
                             Utils.toString(record.headers()), Utils.utf8(record.key()), Utils.utf8(record.value())
                         );
 
-                        log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] out:\n{}\n{}  B:{}={}",
+                        log.debug("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] out:\n{}\n{}  B:{}={}",
                             transformerName, batchId, recordId, transformedRecord,
                             Utils.toString(transformedRecord.headers()), Utils.utf8(transformedRecord.key()), Utils.utf8(transformedRecord.value())
                         );
@@ -192,7 +192,7 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
         int headerId = 0;
         for(String key : keys) {
             String value = String.join(",", map.get(key));
-            log.trace("{}: header {}={}", transformerName, key, value);
+            log.debug("{}: header {}={}", transformerName, key, value);
             headers[headerId++] = new RecordHeader(key, value.getBytes());
         }
         return headers;
@@ -222,7 +222,7 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
             null
         );
 
-        log.trace("{}: newRecord {}", transformerName, newRecord);
+        log.debug("{}: newRecord {}", transformerName, newRecord);
         return newRecord;
     }
 }
