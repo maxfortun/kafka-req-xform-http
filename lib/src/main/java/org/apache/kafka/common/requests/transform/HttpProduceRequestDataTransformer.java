@@ -130,7 +130,10 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             httpRequestBuilder.header(key, value);
         }
 
-        String recordKey = Utils.utf8(record.key());
+        String recordKey = null;
+        if(null != record.key()) {
+            recordKey = Utils.utf8(record.key());
+        }
         if(!Utils.isBlank(recordKey)) {
             httpRequestBuilder.header(httpHeaderPrefix+"broker-message-key", recordKey);
         }
