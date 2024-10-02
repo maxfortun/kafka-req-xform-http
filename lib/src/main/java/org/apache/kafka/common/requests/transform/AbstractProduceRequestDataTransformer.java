@@ -46,7 +46,6 @@ import org.apache.kafka.common.record.SimpleRecord;
 import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.common.utils.ByteBufferInputStream;
 import org.apache.kafka.common.utils.ByteBufferOutputStream;
-import org.apache.kafka.common.utils.Utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -145,12 +144,12 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
 
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
                             transformerName, batchId, recordId, record,
-                            LogUtils.toString(record.headers()), Utils.utf8(record.key()), Utils.utf8(record.value())
+                            Utils.toString(record.headers()), Utils.utf8(record.key()), Utils.utf8(record.value())
                         );
 
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] out:\n{}\n{}  B:{}={}",
                             transformerName, batchId, recordId, transformedRecord,
-                            LogUtils.toString(transformedRecord.headers()), Utils.utf8(transformedRecord.key()), Utils.utf8(transformedRecord.value())
+                            Utils.toString(transformedRecord.headers()), Utils.utf8(transformedRecord.key()), Utils.utf8(transformedRecord.value())
                         );
 
                         recordId++;

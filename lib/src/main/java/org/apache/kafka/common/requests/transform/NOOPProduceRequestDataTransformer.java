@@ -28,7 +28,6 @@ import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.Records;
-import org.apache.kafka.common.utils.Utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +57,7 @@ public class NOOPProduceRequestDataTransformer implements ProduceRequestDataTran
                         for (Record record : recordBatch) {
                             log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}]:\n{}  B:{}={}",
                                 transformerName, batchId, recordId++,
-                                LogUtils.toString(record.headers()), Utils.utf8(record.key()), Utils.utf8(record.value())
+                                Utils.toString(record.headers()), Utils.utf8(record.key()), Utils.utf8(record.value())
                             );
                         }
                     }

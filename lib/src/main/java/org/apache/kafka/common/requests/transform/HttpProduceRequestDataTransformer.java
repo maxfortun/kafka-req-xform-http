@@ -53,7 +53,6 @@ import org.apache.kafka.common.record.SimpleRecord;
 import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.common.utils.ByteBufferInputStream;
 import org.apache.kafka.common.utils.ByteBufferOutputStream;
-import org.apache.kafka.common.utils.Utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,7 +133,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         if(null != record.key()) {
             recordKey = Utils.utf8(record.key());
         }
-        if(!Utils.isBlank(recordKey)) {
+        if(!org.apache.kafka.common.utils.Utils.isBlank(recordKey)) {
             httpRequestBuilder.header(httpHeaderPrefix+"broker-message-key", recordKey);
         }
 

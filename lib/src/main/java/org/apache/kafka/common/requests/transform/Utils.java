@@ -24,11 +24,21 @@ import org.apache.kafka.common.header.Header;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class LogUtils {
-    public static final Logger log = LoggerFactory.getLogger(LogUtils.class);
+public class Utils {
+    public static final Logger log = LoggerFactory.getLogger(Utils.class);
 
-    public static String toString(byte[] bytes) {
-        return new String(bytes, StandardCharsets.UTF_8);
+    public static String utf8(byte[] bytes) {
+		if(null == bytes) {
+			return null;
+		}
+        return org.apache.kafka.common.utils.Utils.utf8(bytes);
+    }
+
+    public static String utf8(ByteBuffer byteBuffer) {
+		if(null == byteBuffer) {
+			return null;
+		}
+        return org.apache.kafka.common.utils.Utils.utf8(byteBuffer);
     }
 
     public static String toString(Header[] headers) {
