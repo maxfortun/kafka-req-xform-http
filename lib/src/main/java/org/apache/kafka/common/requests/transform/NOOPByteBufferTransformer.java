@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.kafka.common.requests.RequestHeader;
+import org.apache.kafka.common.utils.Utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +38,7 @@ public class NOOPByteBufferTransformer implements ByteBufferTransformer {
         int prevPosition = byteBuffer.position();
 
         if (log.isTraceEnabled()) {
-            log.trace("{}: Returning buffer as-is {} {}", transformerName, LogUtils.toString(byteBuffer));
+            log.trace("{}: Returning buffer as-is {} {}", transformerName, Utils.utf8(byteBuffer));
         } else {
             log.debug("{}: Returning buffer as-is {}", transformerName, byteBuffer);
         }

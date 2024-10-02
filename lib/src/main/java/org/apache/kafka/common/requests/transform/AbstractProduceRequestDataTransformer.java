@@ -46,6 +46,7 @@ import org.apache.kafka.common.record.SimpleRecord;
 import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.common.utils.ByteBufferInputStream;
 import org.apache.kafka.common.utils.ByteBufferOutputStream;
+import org.apache.kafka.common.utils.Utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,7 +112,7 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
         ProduceRequestData produceRequestDataOut = produceRequestDataIn.duplicate();
 
         for (RawTaggedField rawTaggedField : produceRequestDataOut.unknownTaggedFields()) {
-            log.trace("{}: rawTaggedField {} = {}", transformerName, rawTaggedField.tag(), LogUtils.toString(rawTaggedField.data()));
+            log.trace("{}: rawTaggedField {} = {}", transformerName, rawTaggedField.tag(), Utils.utf8(rawTaggedField.data()));
         }
 
         for (ProduceRequestData.TopicProduceData topicProduceData : produceRequestDataOut.topicData()) {
@@ -144,12 +145,12 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
 
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
                             transformerName, batchId, recordId, record,
-                            LogUtils.toString(record.headers()), LogUtils.toString(record.key()), LogUtils.toString(record.value())
+                            LogUtils.toString(record.headers()), Utils.utf8(record.key()), Utils.utf8(record.value())
                         );
 
                         log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] out:\n{}\n{}  B:{}={}",
                             transformerName, batchId, recordId, transformedRecord,
-                            LogUtils.toString(transformedRecord.headers()), LogUtils.toString(transformedRecord.key()), LogUtils.toString(transformedRecord.value())
+                            LogUtils.toString(transformedRecord.headers()), Utils.utf8(transformedRecord.key()), Utils.utf8(transformedRecord.value())
                         );
 
                         recordId++;

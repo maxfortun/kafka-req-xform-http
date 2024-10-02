@@ -31,13 +31,6 @@ public class LogUtils {
         return new String(bytes, StandardCharsets.UTF_8);
     }
 
-    public static String toString(ByteBuffer byteBuffer) {
-        if(null == byteBuffer) {
-            return null;
-        }
-        return StandardCharsets.UTF_8.decode(byteBuffer).toString();
-    }
-
     public static String toString(Header[] headers) {
         StringBuffer stringBuffer = new StringBuffer();
         for(Header header : headers) {

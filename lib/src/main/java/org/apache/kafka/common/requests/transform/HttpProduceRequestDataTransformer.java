@@ -53,6 +53,7 @@ import org.apache.kafka.common.record.SimpleRecord;
 import org.apache.kafka.common.record.TimestampType;
 import org.apache.kafka.common.utils.ByteBufferInputStream;
 import org.apache.kafka.common.utils.ByteBufferOutputStream;
+import org.apache.kafka.common.utils.Utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,7 +92,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             return false;
         }
 
-        String shouldBypassValue = LogUtils.toString(shouldBypassHeader.value());
+        String shouldBypassValue = Utils.utf8(shouldBypassHeader.value());
         Boolean shouldBypassBool = Boolean.parseBoolean(shouldBypassValue);
         if(shouldBypassBool) {
             log.trace("{}: Bypassing record. Header {} is {}.", transformerName, shouldBypassKey, shouldBypassValue);
@@ -124,15 +125,16 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 log.trace("{}: req header {} skipped, because it starts with the http header prefix {}", transformerName, key, httpHeaderPrefix);
                 continue;
             }
-            String value = LogUtils.toString(header.value());
+            String value = Utils.utf8(header.value());
             log.trace("{}: req header added {}={}", transformerName, key, value);
             httpRequestBuilder.header(key, value);
         }
 
+        String recordKey = Utils.utf8(record.key());
+
         httpRequestBuilder.header(httpHeaderPrefix+"broker-hostname", brokerHostname);
         httpRequestBuilder.header(httpHeaderPrefix+"broker-topic-name", topicProduceData.name());
-        Date reqDate = new Date();
-        httpRequestBuilder.header(httpHeaderPrefix+"broker-req-time", ""+reqDate.getTime());
+        httpRequestBuilder.header(httpHeaderPrefix+"broker-message-key", recordKey);
 
         ByteBuffer bodyByteBuffer = record.value();
         int position = bodyByteBuffer.position();
@@ -146,6 +148,9 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.ofByteArray(bodyArray);
         log.trace("{}: bodyPublisher {}", transformerName, bodyPublisher);
         httpRequestBuilder.POST(bodyPublisher);
+
+        Date reqDate = new Date();
+        httpRequestBuilder.header(httpHeaderPrefix+"broker-req-time", ""+reqDate.getTime());
 
         HttpRequest httpRequest = httpRequestBuilder.build();
         log.trace("{}: httpRequest {}", transformerName, httpRequest);

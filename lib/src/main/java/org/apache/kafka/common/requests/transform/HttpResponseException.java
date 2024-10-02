@@ -24,11 +24,11 @@ import org.slf4j.LoggerFactory;
 public class HttpResponseException extends Exception {
     public static final Logger log = LoggerFactory.getLogger(HttpResponseException.class);
 
-	private HttpResponse httpResponse;
+    private HttpResponse httpResponse;
 
-	public HttpResponseException(HttpResponse httpResponse) {
-		super(httpResponse.uri()+" returned "+httpResponse.statusCode());
-		this.httpResponse = httpResponse;
-	}
+    public HttpResponseException(HttpResponse httpResponse) {
+        super(httpResponse.uri()+" returned "+httpResponse.statusCode());
+        this.httpResponse = httpResponse;
+    }
 }
 
