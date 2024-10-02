@@ -131,10 +131,12 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
 
         String recordKey = Utils.utf8(record.key());
+        if(!Utils.isBlank(recordKey)) {
+            httpRequestBuilder.header(httpHeaderPrefix+"broker-message-key", recordKey);
+        }
 
         httpRequestBuilder.header(httpHeaderPrefix+"broker-hostname", brokerHostname);
         httpRequestBuilder.header(httpHeaderPrefix+"broker-topic-name", topicProduceData.name());
-        httpRequestBuilder.header(httpHeaderPrefix+"broker-message-key", recordKey);
 
         ByteBuffer bodyByteBuffer = record.value();
         int position = bodyByteBuffer.position();
