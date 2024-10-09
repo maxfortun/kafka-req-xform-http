@@ -125,8 +125,13 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 continue;
             }
             String value = Utils.utf8(header.value());
-            log.debug("{}: req header added {}={}", transformerName, key, value);
-            httpRequestBuilder.header(key, value);
+
+            try {
+                httpRequestBuilder.header(key, value);
+                log.debug("{}: req header added {}={}", transformerName, key, value);
+            } catch(java.lang.IllegalArgumentException e) {
+                log.debug("{}: req header added {}={}", transformerName, key, value, e);
+            }
         }
 
         String recordKey = null;
