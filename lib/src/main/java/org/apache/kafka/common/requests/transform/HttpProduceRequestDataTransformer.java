@@ -85,7 +85,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
     }
 
     protected boolean shouldBypass(RecordHeaders recordHeaders) {
-        String shouldBypassKey = httpHeaderPrefix+"-broker-bypass";
+        String shouldBypassKey = httpHeaderPrefix+"broker-bypass";
         Header shouldBypassHeader = recordHeaders.lastHeader(shouldBypassKey);
         if(null == shouldBypassHeader) {
             log.trace("{}: No header {}", transformerName, shouldBypassKey);
