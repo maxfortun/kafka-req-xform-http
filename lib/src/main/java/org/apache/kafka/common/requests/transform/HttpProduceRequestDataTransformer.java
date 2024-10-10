@@ -88,6 +88,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         String shouldBypassKey = httpHeaderPrefix+"-broker-bypass";
         Header shouldBypassHeader = recordHeaders.lastHeader(shouldBypassKey);
         if(null == shouldBypassHeader) {
+            log.trace("{}: No header {}", transformerName, shouldBypassKey);
             return false;
         }
 
@@ -95,6 +96,8 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         Boolean shouldBypassBool = Boolean.parseBoolean(shouldBypassValue);
         if(shouldBypassBool) {
             log.debug("{}: Bypassing record. Header {} is {}.", transformerName, shouldBypassKey, shouldBypassValue);
+        } else {
+            log.trace("{}: Not bypassing record. Header {} is {}.", transformerName, shouldBypassKey, shouldBypassValue);
         }
 
         return shouldBypassBool;
