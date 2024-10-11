@@ -22,6 +22,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.URI;
+import java.net.URISyntaxException;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -111,12 +112,35 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         RecordHeaders recordHeaders,
         short version
     ) {
+        try {
+            return transformImpl(
+                topicProduceData,
+                partitionProduceData,
+                recordBatch,
+                record,
+                recordHeaders,
+                version
+            );
+        } catch(Exception e) {
+            log.debug("{}", transformerName, e);
+            throw new InvalidRequestException(transformerName, e);
+        }
+    }
+
+    protected Record transformImpl(
+        ProduceRequestData.TopicProduceData topicProduceData,
+        ProduceRequestData.PartitionProduceData partitionProduceData,
+        RecordBatch recordBatch,
+        Record record,
+        RecordHeaders recordHeaders,
+        short version
+    ) throws Exception {
 
         if(shouldBypass(recordHeaders)) {
             return record;
         }
 
-        HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(uri);
+        HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(getURI(record));
         if(null != requestTimeout) {
             httpRequestBuilder.timeout(requestTimeout);
         }
@@ -168,51 +192,54 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         HttpRequest httpRequest = httpRequestBuilder.build();
         log.debug("{}: httpRequest {}", transformerName, httpRequest);
 
-        try {
-            HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
-            log.debug("{}: httpResponse {}", transformerName, httpResponse);
-            if(httpResponse.statusCode() != 200) {
+        HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
+        log.debug("{}: httpResponse {}", transformerName, httpResponse);
+        if(httpResponse.statusCode() != 200) {
 
-                String onHttpException = onHttpExceptionConfig;
-                Header onHttpExceptionHeader = lastHeader(record, transformerName+"-onHttpException");
-                if(null != onHttpExceptionHeader) {
-                    onHttpException = new String(onHttpExceptionHeader.value(), StandardCharsets.UTF_8);
-                }
-    
-                if("original".equalsIgnoreCase(onHttpException)) {
-                    return record;
-                }
-    
-                if(!"pass-thru".equalsIgnoreCase(onHttpException)) {
-                    throw new HttpResponseException(httpResponse);
-                }
+            String onHttpException = onHttpExceptionConfig;
+            Header onHttpExceptionHeader = lastHeader(record, transformerName+"-onHttpException");
+            if(null != onHttpExceptionHeader) {
+                onHttpException = Utils.utf8(onHttpExceptionHeader.value());
             }
 
-            Date resDate = new Date();
-            long runTime = resDate.getTime() - reqDate.getTime();
+            if("original".equalsIgnoreCase(onHttpException)) {
+                return record;
+            }
 
-            Map<String, List<String>> headersMap = new HashMap<>(httpResponse.headers().map());
-
-            // Broker headers should never be returned by the called service.
-            headersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(httpHeaderPrefix+"broker-"));
-
-            headersMap.put(httpHeaderPrefix+"broker-hostname", Arrays.asList(brokerHostname));
-            headersMap.put(httpHeaderPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
-            headersMap.put(httpHeaderPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
-            headersMap.put(httpHeaderPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
-
-            Header[] headers = headers(headersMap);
-
-            byte[] body = httpResponse.body();
-
-            log.trace("{}: res body {}", transformerName, body.length, body);
-            log.debug("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
-
-            return newRecord(recordBatch, record, headers, body);
-        } catch(Exception e) {
-            log.debug("{}: httpRequest {}", transformerName, httpRequest, e);
-            throw new InvalidRequestException(httpRequest.toString(), e);
+            if(!"pass-thru".equalsIgnoreCase(onHttpException)) {
+                throw new HttpResponseException(httpResponse);
+            }
         }
+
+        Date resDate = new Date();
+        long runTime = resDate.getTime() - reqDate.getTime();
+
+        Map<String, List<String>> headersMap = new HashMap<>(httpResponse.headers().map());
+
+        // Broker headers should never be returned by the called service.
+        headersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(httpHeaderPrefix+"broker-"));
+
+        headersMap.put(httpHeaderPrefix+"broker-hostname", Arrays.asList(brokerHostname));
+        headersMap.put(httpHeaderPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
+        headersMap.put(httpHeaderPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
+        headersMap.put(httpHeaderPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
+
+        Header[] headers = headers(headersMap);
+
+        byte[] body = httpResponse.body();
+
+        log.trace("{}: res body {}", transformerName, body.length, body);
+        log.debug("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
+
+        return newRecord(recordBatch, record, headers, body);
+    }
+
+    private URI getURI(Record record) throws URISyntaxException {
+        Header recordURIHeader = lastHeader(record, transformerName+"broker-uri");
+        if(null != recordURIHeader) {
+            return new URI(Utils.utf8(recordURIHeader.value()));
+        }
+        return uri;
     }
 }
 
