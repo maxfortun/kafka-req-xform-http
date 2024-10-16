@@ -116,10 +116,13 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
     protected boolean configured(String key, String value) {
         String pattern = appConfig(key);
         if(null == pattern) {
+            log.trace("{}: No pattern configured for {} = {}. Defaulting to true.", transformerName, key, value);
             return true;
         }
         
-        return value.matches(pattern);
+        boolean result = value.matches(pattern);
+        log.trace("{}: {} configured for {} = {}. Returning {}.", transformerName, pattern, key, value, result);
+        return result;
     }
 
     protected boolean configured(RecordHeaders recordHeaders, String key, String type, String value) {
@@ -129,10 +132,13 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
     protected boolean configured(RecordHeaders recordHeaders, String key, String value) {
         String pattern = reqConfig(recordHeaders, key);
         if(null == pattern) {
+            log.trace("{}: No pattern configured for {} = {}. Defaulting to true.", transformerName, key, value);
             return true;
         }
         
-        return value.matches(pattern);
+        boolean result = value.matches(pattern);
+        log.trace("{}: {} configured for {} = {}. Returning {}.", transformerName, pattern, key, value, result);
+        return result;
     }
 
     protected String reqConfig(RecordHeaders recordHeaders, String key) {
@@ -150,14 +156,6 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
         String value = Utils.utf8(header.value());
         log.debug("{}: Header {} is {}.", transformerName, fullKey, value);
         return value;
-    }
-
-    protected boolean should(RecordHeaders recordHeaders, String name) {
-        String value = reqConfig(recordHeaders, name);
-        if(null == value) {
-            return false;
-        }
-        return Boolean.parseBoolean(value);
     }
 
     public ProduceRequestData transform(ProduceRequestData produceRequestDataIn, short version) {
