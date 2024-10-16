@@ -115,7 +115,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         short version
     ) throws Exception {
 
-        if(!should(recordHeaders, "enable")) {
+        if(!configured(recordHeaders, "enable", "true")) {
             return record;
         }
 
@@ -193,15 +193,23 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         // Broker headers should never be returned by the called service.
         headersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(headerPrefix+"broker-"));
 
-        headersMap.put(headerPrefix+"broker-hostname", Arrays.asList(brokerHostname));
-        headersMap.put(headerPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
-        headersMap.put(headerPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
-        headersMap.put(headerPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
+        if(configured("in-headers", "hostname")) {
+            headersMap.put(headerPrefix+"broker-hostname", Arrays.asList(brokerHostname));
+        }
 
-        if(null != envRegex && should(recordHeaders, "env")) {
+        if(configured("in-headers", "time")) {
+            headersMap.put(headerPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
+            headersMap.put(headerPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
+        }
+
+        if(configured("in-headers", "timespan")) {
+            headersMap.put(headerPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
+        }
+
+        if(null != envRegex && configured(recordHeaders, "in-headers", "env")) {
             Map<String,String> env = System.getenv();
             env.entrySet().removeIf(entry -> !entry.getKey().matches(envRegex));
-            env.forEach( (key, value) ->  headersMap.put(headerPrefix+"broker-env-"+key.replaceAll("_","-"), Arrays.asList(value)) );
+            env.forEach( (key, value) -> headersMap.put(headerPrefix+"broker-env-"+key.replaceAll("_","-"), Arrays.asList(value)) );
         }
 
         Header[] headers = headers(headersMap);

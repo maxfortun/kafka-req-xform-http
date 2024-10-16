@@ -109,17 +109,34 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
         return null;
     }
 
-    protected boolean scoped(String key, String scope) {
-        String scopes = appConfig(key+".scopes");
-        if(null == scopes) {
+    protected boolean configured(String key, String type, String value) {
+        return configured(key+"."+type, value);
+    }
+
+    protected boolean configured(String key, String value) {
+        String pattern = appConfig(key);
+        if(null == pattern) {
             return true;
         }
         
-        return scope.matches(scopes);
+        return value.matches(pattern);
+    }
+
+    protected boolean configured(RecordHeaders recordHeaders, String key, String type, String value) {
+        return configured(recordHeaders, key+"."+type, value);
+    }
+
+    protected boolean configured(RecordHeaders recordHeaders, String key, String value) {
+        String pattern = reqConfig(recordHeaders, key);
+        if(null == pattern) {
+            return true;
+        }
+        
+        return value.matches(pattern);
     }
 
     protected String reqConfig(RecordHeaders recordHeaders, String key) {
-        if(!scoped(key, "request")) {
+        if(!configured(key, "scopes", "request")) {
             return appConfig(key);
         }
 
