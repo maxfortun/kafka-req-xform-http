@@ -66,59 +66,21 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final Duration requestTimeout;
 
-    private final String httpHeaderPrefix;
     private final String envRegex;
-
-	private final Map<String,String> config = new HashMap<>();
 
     public HttpProduceRequestDataTransformer(String transformerName) {
         super(transformerName);
 
         brokerHostname = System.getenv("HOSTNAME"); 
 
-
-        String requestTimeoutString = getConfig("requestTimeout");
+        String requestTimeoutString = appConfig("requestTimeout");
         if(null != requestTimeoutString) {
             requestTimeout = Duration.parse(requestTimeoutString);
         } else {
             requestTimeout = null;
         }
 
-        httpHeaderPrefix = getConfig("httpHeaderPrefix", transformerName+"-");
-        envRegex = getConfig("envRegex");
-
-		/* Configuration that may be overwritten from request */
-
-        config.put("uri", getConfig("uri"));
-
-        // Valid values:
-        //   fail:       fail the request
-        //   pass-thru:  return the response as-is
-        //   original:   return the original request
-        config.put("onHttpException", getConfig("onHttpException", "fail"));
-
-
-    }
-
-    protected String config(RecordHeaders recordHeaders, String name) {
-        String key = httpHeaderPrefix+"broker-"+name;
-        Header header = recordHeaders.lastHeader(key);
-        if(null == header) {
-            log.trace("{}: No header {}", transformerName, key);
-            return config.get(name);
-        }
-
-        String value = Utils.utf8(header.value());
-        log.debug("{}: Header {} is {}.", transformerName, key, value);
-        return value;
-     }
-
-    protected boolean should(RecordHeaders recordHeaders, String name) {
-        String value = config(recordHeaders, name);
-        if(null == value) {
-            return false;
-        }
-        return Boolean.parseBoolean(value);
+        envRegex = appConfig("envRegex");
     }
 
     protected Record transform(
@@ -153,19 +115,19 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         short version
     ) throws Exception {
 
-        if(should(recordHeaders, "bypass")) {
+        if(!should(recordHeaders, "enable")) {
             return record;
         }
 
-        HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(new URI(config(recordHeaders, "uri")));
+        HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(new URI(reqConfig(recordHeaders, "uri")));
         if(null != requestTimeout) {
             httpRequestBuilder.timeout(requestTimeout);
         }
 
         for(Header header : record.headers()) {
             String key = header.key();
-            if(key.matches("(?i)^"+httpHeaderPrefix)) {
-                log.debug("{}: req header {} skipped, because it starts with the http header prefix {}", transformerName, key, httpHeaderPrefix);
+            if(key.matches("(?i)^"+headerPrefix)) {
+                log.debug("{}: req header {} skipped, because it starts with the http header prefix {}", transformerName, key, headerPrefix);
                 continue;
             }
             String value = Utils.utf8(header.value());
@@ -183,11 +145,11 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             recordKey = Utils.utf8(record.key());
         }
         if(!org.apache.kafka.common.utils.Utils.isBlank(recordKey)) {
-            httpRequestBuilder.header(httpHeaderPrefix+"broker-message-key", recordKey);
+            httpRequestBuilder.header(headerPrefix+"broker-message-key", recordKey);
         }
 
-        httpRequestBuilder.header(httpHeaderPrefix+"broker-hostname", brokerHostname);
-        httpRequestBuilder.header(httpHeaderPrefix+"broker-topic-name", topicProduceData.name());
+        httpRequestBuilder.header(headerPrefix+"broker-hostname", brokerHostname);
+        httpRequestBuilder.header(headerPrefix+"broker-topic-name", topicProduceData.name());
 
         ByteBuffer bodyByteBuffer = record.value();
         int position = bodyByteBuffer.position();
@@ -204,7 +166,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         httpRequestBuilder.POST(bodyPublisher);
 
         Date reqDate = new Date();
-        httpRequestBuilder.header(httpHeaderPrefix+"broker-req-time", ""+reqDate.getTime());
+        httpRequestBuilder.header(headerPrefix+"broker-req-time", ""+reqDate.getTime());
 
         HttpRequest httpRequest = httpRequestBuilder.build();
         log.debug("{}: httpRequest {}", transformerName, httpRequest);
@@ -212,7 +174,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
         log.debug("{}: httpResponse {}", transformerName, httpResponse);
         if(httpResponse.statusCode() != 200) {
-            String onHttpException = config(recordHeaders, "onHttpException");
+            String onHttpException = reqConfig(recordHeaders, "onHttpException");
 
             if("original".equalsIgnoreCase(onHttpException)) {
                 return record;
@@ -229,17 +191,17 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         Map<String, List<String>> headersMap = new HashMap<>(httpResponse.headers().map());
 
         // Broker headers should never be returned by the called service.
-        headersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(httpHeaderPrefix+"broker-"));
+        headersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(headerPrefix+"broker-"));
 
-        headersMap.put(httpHeaderPrefix+"broker-hostname", Arrays.asList(brokerHostname));
-        headersMap.put(httpHeaderPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
-        headersMap.put(httpHeaderPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
-        headersMap.put(httpHeaderPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
+        headersMap.put(headerPrefix+"broker-hostname", Arrays.asList(brokerHostname));
+        headersMap.put(headerPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
+        headersMap.put(headerPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
+        headersMap.put(headerPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
 
         if(null != envRegex && should(recordHeaders, "env")) {
             Map<String,String> env = System.getenv();
             env.entrySet().removeIf(entry -> !entry.getKey().matches(envRegex));
-            env.forEach( (key, value) ->  headersMap.put(httpHeaderPrefix+"broker-env-"+key.replaceAll("_","-"), Arrays.asList(value)) );
+            env.forEach( (key, value) ->  headersMap.put(headerPrefix+"broker-env-"+key.replaceAll("_","-"), Arrays.asList(value)) );
         }
 
         Header[] headers = headers(headersMap);

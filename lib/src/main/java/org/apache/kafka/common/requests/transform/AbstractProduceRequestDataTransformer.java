@@ -58,33 +58,35 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
     private ResourceBundle resources = null;
 
     private final String topicNamePattern;
+	protected final String headerPrefix;
 
     public AbstractProduceRequestDataTransformer(String transformerName) {
         this.transformerName = transformerName;
 
-        topicNamePattern = getConfig("topicNamePattern");
+        topicNamePattern = appConfig("topicNamePattern");
+		headerPrefix = appConfig("httpHeaderPrefix", transformerName+"-");
     }
 
-    protected String getConfig(String key, String defaultValue) {
-        String value = getConfig(key);
+    protected String appConfig(String key, String defaultValue) {
+        String value = appConfig(key);
         if(null != value) {
             return value;
         }
         return defaultValue;
     }
 
-    protected String getConfig(String key) {
+    protected String appConfig(String key) {
         String fullKey = transformerName+"-"+key;
         String value = System.getProperty(fullKey);
         if(null != value) {
-            log.trace("{}: getConfig prop {} = {}", transformerName, fullKey, value);
+            log.trace("{}: appConfig prop {} = {}", transformerName, fullKey, value);
             return value;
         }
         
         fullKey = transformerName.replaceAll("[.-]", "_")+"_"+key;
         value = System.getenv(fullKey);
         if(null != value) {
-            log.trace("{}: getConfig env {} = {}", transformerName, fullKey, value);
+            log.trace("{}: appConfig env {} = {}", transformerName, fullKey, value);
             return value;
         }
         
@@ -99,12 +101,46 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
         }
 
         if(null != value) {
-            log.trace("{}: getConfig bundle {} = {}", transformerName, fullKey, value);
+            log.trace("{}: appConfig bundle {} = {}", transformerName, fullKey, value);
             return value;
         }
 
-        log.trace("{}: getConfig {} = null", transformerName, key);
+        log.trace("{}: appConfig {} = null", transformerName, key);
         return null;
+    }
+
+    protected boolean scoped(String key, String scope) {
+        String scopes = appConfig(key+".scopes");
+		if(null == scopes) {
+			return true;
+		}
+		
+        return scope.matches(scopes);
+    }
+
+    protected String reqConfig(RecordHeaders recordHeaders, String key) {
+        if(!scoped(key, "request")) {
+            return appConfig(key);
+        }
+
+        String fullKey = headerPrefix+"broker-"+key;
+        Header header = recordHeaders.lastHeader(fullKey);
+        if(null == header) {
+            log.trace("{}: No header {}", transformerName, fullKey);
+            return appConfig(key);
+        }
+
+        String value = Utils.utf8(header.value());
+        log.debug("{}: Header {} is {}.", transformerName, fullKey, value);
+        return value;
+    }
+
+    protected boolean should(RecordHeaders recordHeaders, String name) {
+        String value = reqConfig(recordHeaders, name);
+        if(null == value) {
+            return false;
+        }
+        return Boolean.parseBoolean(value);
     }
 
     public ProduceRequestData transform(ProduceRequestData produceRequestDataIn, short version) {

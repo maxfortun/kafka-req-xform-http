@@ -13,6 +13,29 @@ All headers have a prefix of `plugin prefx`-`broker`-.
 |Name|Default|Values|Effect|
 |---|---|---|---|
 |uri|||Uri of the service to forward requests to. Overrides default.|
-|enabled|true|true,false|Is forwarding to service enabled?|
+|enable|true|true,false|Is forwarding to service enabled?|
 |in-headers||env,time,timespan|Include in response headers|
 |onHttpException|fail|fail,pass-thru,original|Exception handling behavior|
+
+### Sample config
+```
+enable=true
+enable.values=(?i)^(true|false|yes|no)$
+enable.scopes=(?i)^(app|request)$
+
+uri=$CONTENT_LAKE_URL
+uri.scopes=(?i)^(app|request)$
+
+topicNamePattern=(?i)^(?!__).*$
+topicNamePattern.scopes=(?i)^(app)$
+
+onHttpException=fail
+onHttpException.values=(?i)^(fail|pass-thru|original)$
+onHttpException.scopes=(?i)^(app|request)$
+
+#httpHeaderPrefix=content-lake-
+httpHeaderPrefix.scopes=(?i)^(app)$
+
+in-headers=(?i)^(env|time|timespan)$
+in-headers.scopes=(?i)^(app|request)$
+```
