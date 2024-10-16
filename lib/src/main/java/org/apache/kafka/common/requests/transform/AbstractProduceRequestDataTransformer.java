@@ -165,18 +165,6 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
         return produceRequestDataOut;
     }
 
-    protected Header lastHeader(Record record, String key) {
-        Optional<Header> optional = Arrays.stream(record.headers())
-                                   .filter(header -> key.equals(header.key()))
-                                   .reduce((a, b) -> b);
-
-        if(optional.isPresent()) {
-            return optional.get();
-        }
-
-        return null;
-    }
-
     protected abstract Record transform(
         ProduceRequestData.TopicProduceData topicProduceData,
         ProduceRequestData.PartitionProduceData partitionProduceData,

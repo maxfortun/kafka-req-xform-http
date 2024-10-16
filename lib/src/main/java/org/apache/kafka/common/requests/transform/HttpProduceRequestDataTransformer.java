@@ -64,19 +64,18 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
     private final String brokerHostname;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
-    private final URI uri;
     private final Duration requestTimeout;
 
-    private final String onHttpExceptionConfig;
     private final String httpHeaderPrefix;
     private final String envRegex;
+
+	private final Map<String,String> config = new HashMap<>();
 
     public HttpProduceRequestDataTransformer(String transformerName) {
         super(transformerName);
 
         brokerHostname = System.getenv("HOSTNAME"); 
 
-        uri = URI.create(getConfig("uri"));
 
         String requestTimeoutString = getConfig("requestTimeout");
         if(null != requestTimeoutString) {
@@ -85,15 +84,20 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             requestTimeout = null;
         }
 
+        httpHeaderPrefix = getConfig("httpHeaderPrefix", transformerName+"-");
+        envRegex = getConfig("envRegex");
+
+		/* Configuration that may be overwritten from request */
+
+        config.put("uri", getConfig("uri"));
+
         // Valid values:
         //   fail:       fail the request
         //   pass-thru:  return the response as-is
         //   original:   return the original request
-        onHttpExceptionConfig = getConfig("onHttpException", "fail");
+        config.put("onHttpException", getConfig("onHttpException", "fail"));
 
-        httpHeaderPrefix = getConfig("httpHeaderPrefix", transformerName+"-");
 
-        envRegex = getConfig("envRegex");
     }
 
     protected String config(RecordHeaders recordHeaders, String name) {
@@ -101,7 +105,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         Header header = recordHeaders.lastHeader(key);
         if(null == header) {
             log.trace("{}: No header {}", transformerName, key);
-            return null;
+            return config.get(name);
         }
 
         String value = Utils.utf8(header.value());
@@ -153,7 +157,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             return record;
         }
 
-        HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(getURI(record));
+        HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(new URI(config(recordHeaders, "uri")));
         if(null != requestTimeout) {
             httpRequestBuilder.timeout(requestTimeout);
         }
@@ -208,12 +212,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
         log.debug("{}: httpResponse {}", transformerName, httpResponse);
         if(httpResponse.statusCode() != 200) {
-
-            String onHttpException = onHttpExceptionConfig;
-            Header onHttpExceptionHeader = lastHeader(record, transformerName+"-onHttpException");
-            if(null != onHttpExceptionHeader) {
-                onHttpException = Utils.utf8(onHttpExceptionHeader.value());
-            }
+            String onHttpException = config(recordHeaders, "onHttpException");
 
             if("original".equalsIgnoreCase(onHttpException)) {
                 return record;
@@ -251,14 +250,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         log.debug("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
 
         return newRecord(recordBatch, record, headers, body);
-    }
-
-    private URI getURI(Record record) throws URISyntaxException {
-        Header recordURIHeader = lastHeader(record, transformerName+"broker-uri");
-        if(null != recordURIHeader) {
-            return new URI(Utils.utf8(recordURIHeader.value()));
-        }
-        return uri;
     }
 }
 
