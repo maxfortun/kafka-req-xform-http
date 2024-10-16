@@ -61,19 +61,28 @@ import org.slf4j.LoggerFactory;
 public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDataTransformer {
     public static final Logger log = LoggerFactory.getLogger(HttpProduceRequestDataTransformer.class);
 
-    private HttpClient httpClient = HttpClient.newHttpClient();
-    private URI uri;
-    private Duration requestTimeout;
+    private final String brokerHostname;
+
+    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final URI uri;
+    private final Duration requestTimeout;
+
     private final String onHttpExceptionConfig;
     private final String httpHeaderPrefix;
-    private final String brokerHostname;
+    private final String envRegex;
 
     public HttpProduceRequestDataTransformer(String transformerName) {
         super(transformerName);
+
+        brokerHostname = System.getenv("HOSTNAME"); 
+
         uri = URI.create(getConfig("uri"));
+
         String requestTimeoutString = getConfig("requestTimeout");
         if(null != requestTimeoutString) {
             requestTimeout = Duration.parse(requestTimeoutString);
+        } else {
+            requestTimeout = null;
         }
 
         // Valid values:
@@ -81,27 +90,31 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         //   pass-thru:  return the response as-is
         //   original:   return the original request
         onHttpExceptionConfig = getConfig("onHttpException", "fail");
+
         httpHeaderPrefix = getConfig("httpHeaderPrefix", transformerName+"-");
-        brokerHostname = System.getenv("HOSTNAME"); 
+
+        envRegex = getConfig("envRegex");
     }
 
-    protected boolean shouldBypass(RecordHeaders recordHeaders) {
-        String shouldBypassKey = httpHeaderPrefix+"broker-bypass";
-        Header shouldBypassHeader = recordHeaders.lastHeader(shouldBypassKey);
-        if(null == shouldBypassHeader) {
-            log.trace("{}: No header {}", transformerName, shouldBypassKey);
+    protected String config(RecordHeaders recordHeaders, String name) {
+        String key = httpHeaderPrefix+"broker-"+name;
+        Header header = recordHeaders.lastHeader(key);
+        if(null == header) {
+            log.trace("{}: No header {}", transformerName, key);
+            return null;
+        }
+
+        String value = Utils.utf8(header.value());
+        log.debug("{}: Header {} is {}.", transformerName, key, value);
+        return value;
+     }
+
+    protected boolean should(RecordHeaders recordHeaders, String name) {
+        String value = config(recordHeaders, name);
+        if(null == value) {
             return false;
         }
-
-        String shouldBypassValue = Utils.utf8(shouldBypassHeader.value());
-        Boolean shouldBypassBool = Boolean.parseBoolean(shouldBypassValue);
-        if(shouldBypassBool) {
-            log.debug("{}: Bypassing record. Header {} is {}.", transformerName, shouldBypassKey, shouldBypassValue);
-        } else {
-            log.trace("{}: Not bypassing record. Header {} is {}.", transformerName, shouldBypassKey, shouldBypassValue);
-        }
-
-        return shouldBypassBool;
+        return Boolean.parseBoolean(value);
     }
 
     protected Record transform(
@@ -136,7 +149,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         short version
     ) throws Exception {
 
-        if(shouldBypass(recordHeaders)) {
+        if(should(recordHeaders, "bypass")) {
             return record;
         }
 
@@ -223,6 +236,12 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         headersMap.put(httpHeaderPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
         headersMap.put(httpHeaderPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
         headersMap.put(httpHeaderPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
+
+        if(null != envRegex && should(recordHeaders, "env")) {
+            Map<String,String> env = System.getenv();
+            env.entrySet().removeIf(entry -> !entry.getKey().matches(envRegex));
+            env.forEach( (key, value) ->  headersMap.put(httpHeaderPrefix+"broker-env-"+key.replaceAll("_","-"), Arrays.asList(value)) );
+        }
 
         Header[] headers = headers(headersMap);
 
