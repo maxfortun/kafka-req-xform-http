@@ -58,13 +58,13 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
     private ResourceBundle resources = null;
 
     private final String topicNamePattern;
-	protected final String headerPrefix;
+    protected final String headerPrefix;
 
     public AbstractProduceRequestDataTransformer(String transformerName) {
         this.transformerName = transformerName;
 
         topicNamePattern = appConfig("topicNamePattern");
-		headerPrefix = appConfig("httpHeaderPrefix", transformerName+"-");
+        headerPrefix = appConfig("httpHeaderPrefix", transformerName+"-");
     }
 
     protected String appConfig(String key, String defaultValue) {
@@ -111,10 +111,10 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
 
     protected boolean scoped(String key, String scope) {
         String scopes = appConfig(key+".scopes");
-		if(null == scopes) {
-			return true;
-		}
-		
+        if(null == scopes) {
+            return true;
+        }
+        
         return scope.matches(scopes);
     }
 
