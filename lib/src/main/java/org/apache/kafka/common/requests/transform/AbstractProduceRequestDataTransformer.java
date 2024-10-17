@@ -243,13 +243,17 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
     }
 
     protected Record newRecord(RecordBatch recordBatch, Record record, Header[] headers, byte[] body) throws IOException {
+        return newRecord(recordBatch, record, headers, ByteBuffer.wrap(body));
+    }
+
+    protected Record newRecord(RecordBatch recordBatch, Record record, Header[] headers, ByteBuffer body) throws IOException {
         ByteBufferOutputStream out = new ByteBufferOutputStream(1024);
         DefaultRecord.writeTo(
             new DataOutputStream(out),
             (int)record.offset(),
             record.timestamp(),
             record.key(),
-            ByteBuffer.wrap(body),
+            body,
             headers
         );
         ByteBuffer buffer = out.buffer();

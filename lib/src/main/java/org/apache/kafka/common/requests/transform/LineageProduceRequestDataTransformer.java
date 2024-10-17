@@ -97,7 +97,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         }
 
         log.debug("{}: Updated lineage: {}", transformerName, lineage);
-        return record;
+        return newRecord(recordBatch, record, recordHeaders.toArray(), record.value());
     }
 
     private String getLineage(RecordHeaders recordHeaders, String key) {
