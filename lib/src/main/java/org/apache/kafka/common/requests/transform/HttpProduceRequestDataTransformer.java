@@ -66,7 +66,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final Duration requestTimeout;
 
-    private final String envRegex;
+    private final String envPattern;
 
     public HttpProduceRequestDataTransformer(String transformerName) {
         super(transformerName);
@@ -80,7 +80,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             requestTimeout = null;
         }
 
-        envRegex = appConfig("envRegex");
+        envPattern = appConfig("envPattern");
     }
 
     protected Record transform(
@@ -118,6 +118,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         if(!configured(recordHeaders, "enable", "true")) {
             return record;
         }
+        Date inDate = new Date();
 
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(new URI(reqConfig(recordHeaders, "uri")));
         if(null != requestTimeout) {
@@ -193,7 +194,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
 
         Date resDate = new Date();
-        long runTime = resDate.getTime() - reqDate.getTime();
+        long reqRunTime = resDate.getTime() - reqDate.getTime();
 
         // Broker headers should never be returned by the called service.
         headersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(headerPrefix+"broker-"));
@@ -202,22 +203,28 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             headersMap.put(headerPrefix+"broker-hostname", Arrays.asList(brokerHostname));
         }
 
-        if(configured("in-headers", "time")) {
-            headersMap.put(headerPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
-            headersMap.put(headerPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
-        }
-
-        if(configured("in-headers", "timespan")) {
-            headersMap.put(headerPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
-        }
-
-        if(null != envRegex && configured(recordHeaders, "in-headers", "env")) {
+       if(null != envPattern && configured(recordHeaders, "in-headers", "env")) {
             Map<String,String> env = System.getenv();
-            env.entrySet().removeIf(entry -> !entry.getKey().matches(envRegex));
+            env.entrySet().removeIf(entry -> !entry.getKey().matches(envPattern));
             env.forEach( (key, value) -> headersMap.put(headerPrefix+"broker-env-"+key.replaceAll("_","-"), Arrays.asList(value)) );
         }
 
-        Header[] headers = headers(headersMap);
+        Date outDate = new Date();
+        long runTime = outDate.getTime() - inDate.getTime();
+
+        if(configured("in-headers", "time")) {
+            headersMap.put(headerPrefix+"broker-in-time", Arrays.asList(""+inDate.getTime()));
+            headersMap.put(headerPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
+            headersMap.put(headerPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
+            headersMap.put(headerPrefix+"broker-out-time", Arrays.asList(""+outDate.getTime()));
+        }
+
+        if(configured("in-headers", "timespan")) {
+            headersMap.put(headerPrefix+"broker-req-timespan", Arrays.asList(""+reqRunTime));
+            headersMap.put(headerPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
+        }
+
+         Header[] headers = headers(headersMap);
 
         log.trace("{}: res body {}", transformerName, body.length, body);
         log.debug("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );

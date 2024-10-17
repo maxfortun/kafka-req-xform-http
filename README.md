@@ -14,7 +14,7 @@ All headers have a prefix of `plugin prefx`-`broker`-.
 |---|---|---|---|
 |uri|||Uri of the service to forward requests to. Overrides default.|
 |enable|true|true,false|Is forwarding to service enabled?|
-|in-headers||env,time,timespan|Include in response headers|
+|in-headers||env,time,timespan,hostname|Include in response headers|
 |onHttpException|fail|fail,pass-thru,original|Exception handling behavior|
 
 ### Sample config
@@ -40,6 +40,6 @@ onHttpException.scopes=(?i)^(app|request)$
 #httpHeaderPrefix=content-lake-
 httpHeaderPrefix.scopes=(?i)^(app)$
 
-in-headers=(?i)^(env|time|timespan)$
+in-headers=(?i)^(env|time|timespan|hostname)$
 in-headers.scopes=(?i)^(app|request)$
 ```
