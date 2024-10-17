@@ -194,9 +194,9 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
 
         if(null != envPattern && configured(recordHeaders, "in-headers", "env")) {
-            Map<String,String> env = new HashMap<>(System.getenv());
-            env.entrySet().removeIf(entry -> !entry.getKey().matches(envPattern));
-            env.forEach( (key, value) -> headersMap.put(headerPrefix+"broker-env-"+key.replaceAll("_","-"), Arrays.asList(value)) );
+			System.getenv().entrySet().stream()
+				.filter( entry -> entry.getKey().matches(envPattern) )
+            	.forEach( entry -> headersMap.put(headerPrefix+"broker-env-"+entry.getKey().replaceAll("_","-"), Arrays.asList(entry.getValue())) );
         }
 
         Date outDate = new Date();
