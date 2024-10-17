@@ -171,24 +171,29 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         HttpRequest httpRequest = httpRequestBuilder.build();
         log.debug("{}: httpRequest {}", transformerName, httpRequest);
 
-        HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
-        log.debug("{}: httpResponse {}", transformerName, httpResponse);
-        if(httpResponse.statusCode() != 200) {
-            String onHttpException = reqConfig(recordHeaders, "onHttpException");
+        Map<String, List<String>> headersMap = new HashMap<>();
+        byte[] body = new byte[0];
 
-            if("original".equalsIgnoreCase(onHttpException)) {
-                return record;
-            }
+        if(configured(recordHeaders, "enable-send", "true")) {
+            HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
+            log.debug("{}: httpResponse {}", transformerName, httpResponse);
+            if(httpResponse.statusCode() != 200) {
+                String onHttpException = reqConfig(recordHeaders, "onHttpException");
 
-            if(!"pass-thru".equalsIgnoreCase(onHttpException)) {
-                throw new HttpResponseException(httpResponse);
+                if("original".equalsIgnoreCase(onHttpException)) {
+                    return record;
+                }
+
+                if(!"pass-thru".equalsIgnoreCase(onHttpException)) {
+                    throw new HttpResponseException(httpResponse);
+                }
             }
+            headersMap.putAll(httpResponse.headers().map());
+            body = httpResponse.body();
         }
 
         Date resDate = new Date();
         long runTime = resDate.getTime() - reqDate.getTime();
-
-        Map<String, List<String>> headersMap = new HashMap<>(httpResponse.headers().map());
 
         // Broker headers should never be returned by the called service.
         headersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(headerPrefix+"broker-"));
@@ -213,8 +218,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
 
         Header[] headers = headers(headersMap);
-
-        byte[] body = httpResponse.body();
 
         log.trace("{}: res body {}", transformerName, body.length, body);
         log.debug("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );

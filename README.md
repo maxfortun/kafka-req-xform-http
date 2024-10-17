@@ -20,8 +20,12 @@ All headers have a prefix of `plugin prefx`-`broker`-.
 ### Sample config
 ```
 enable=true
-enable.values=(?i)^(true|false|yes|no)$
+enable.values=(?i)^(true|false)$
 enable.scopes=(?i)^(app|request)$
+
+enable-send=true
+enable-send.values=(?i)^(true|false)$
+enable-send.scopes=(?i)^(app|request)$
 
 uri=$CONTENT_LAKE_URL
 uri.scopes=(?i)^(app|request)$
