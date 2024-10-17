@@ -31,14 +31,11 @@ import org.slf4j.LoggerFactory;
 public class LineageProduceRequestDataTransformer extends AbstractProduceRequestDataTransformer {
     public static final Logger log = LoggerFactory.getLogger(LineageProduceRequestDataTransformer.class);
 
-	private String lineagePrefix = "/";
+    private String lineagePrefix;
 
     public LineageProduceRequestDataTransformer(String transformerName) {
         super(transformerName);
-		String appName = System.getenv("APP_NAME");
-		if(null != appName) {
-			lineagePrefix += appName + ":";
-		}
+        lineagePrefix = appConfig("prefix", "/");
     }
 
     protected Record transform(
@@ -79,13 +76,13 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
 
         Date inDate = new Date();
 
-		String key = reqConfig(recordHeaders, "key");
-		if(null == key) {
-			key = transformerName;
-		}
+        String key = reqConfig(recordHeaders, "key");
+        if(null == key) {
+            key = transformerName;
+        }
 
-		String lineage = getLineage(recordHeaders, key)+lineagePrefix+topicProduceData.name();
-		setHeader(recordHeaders, key, lineage);
+        String lineage = getLineage(recordHeaders, key)+lineagePrefix+topicProduceData.name();
+        setHeader(recordHeaders, key, lineage);
 
         Date outDate = new Date();
         long runTime = outDate.getTime() - inDate.getTime();
@@ -103,14 +100,14 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         return record;
     }
 
-	private String getLineage(RecordHeaders recordHeaders, String key) {
-		Header header = recordHeaders.lastHeader(key);
+    private String getLineage(RecordHeaders recordHeaders, String key) {
+        Header header = recordHeaders.lastHeader(key);
 
-		if(null == header) {
-			return "";
-		}
+        if(null == header) {
+            return "";
+        }
 
-		return Utils.utf8(header.value());
-	}
+        return Utils.utf8(header.value());
+    }
 }
 
