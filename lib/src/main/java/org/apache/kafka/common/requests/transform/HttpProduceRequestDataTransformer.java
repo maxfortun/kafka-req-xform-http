@@ -42,18 +42,8 @@ import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.message.ProduceRequestData;
-import org.apache.kafka.common.protocol.types.RawTaggedField;
-import org.apache.kafka.common.record.CompressionType;
-import org.apache.kafka.common.record.DefaultRecord;
-import org.apache.kafka.common.record.MemoryRecords;
-import org.apache.kafka.common.record.MemoryRecordsBuilder;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
-import org.apache.kafka.common.record.Records;
-import org.apache.kafka.common.record.SimpleRecord;
-import org.apache.kafka.common.record.TimestampType;
-import org.apache.kafka.common.utils.ByteBufferInputStream;
-import org.apache.kafka.common.utils.ByteBufferOutputStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -203,7 +193,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             headersMap.put(headerPrefix+"broker-hostname", Arrays.asList(brokerHostname));
         }
 
-       if(null != envPattern && configured(recordHeaders, "in-headers", "env")) {
+        if(null != envPattern && configured(recordHeaders, "in-headers", "env")) {
             Map<String,String> env = System.getenv();
             env.entrySet().removeIf(entry -> !entry.getKey().matches(envPattern));
             env.forEach( (key, value) -> headersMap.put(headerPrefix+"broker-env-"+key.replaceAll("_","-"), Arrays.asList(value)) );
@@ -224,7 +214,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             headersMap.put(headerPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
         }
 
-         Header[] headers = headers(headersMap);
+        Header[] headers = headers(headersMap);
 
         log.trace("{}: res body {}", transformerName, body.length, body);
         log.debug("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );

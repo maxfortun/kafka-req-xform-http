@@ -237,6 +237,11 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
         return headers;
     }
 
+    protected void setHeader(RecordHeaders recordHeaders, String key, String value) {
+        recordHeaders.remove(key);
+        recordHeaders.add(key, value.getBytes());
+    }
+
     protected Record newRecord(RecordBatch recordBatch, Record record, Header[] headers, byte[] body) throws IOException {
         ByteBufferOutputStream out = new ByteBufferOutputStream(1024);
         DefaultRecord.writeTo(
