@@ -81,7 +81,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
             key = transformerName;
         }
 
-        String lineage = getLineage(recordHeaders, key)+lineagePrefix+topicProduceData.name();
+        String lineage = getLineage(topicProduceData, recordHeaders, key);
         setHeader(recordHeaders, key, lineage);
 
         Date outDate = new Date();
@@ -100,7 +100,15 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         return newRecord(recordBatch, record, recordHeaders.toArray(), record.value());
     }
 
-    private String getLineage(RecordHeaders recordHeaders, String key) {
+    private String getLineage(ProduceRequestData.TopicProduceData topicProduceData, RecordHeaders recordHeaders, String key, Date inDate) {
+		String lineage = getCurrentLineage(recordHeaders, key)+lineagePrefix+topicProduceData.name();
+        if(configured(recordHeaders, "in-time", "true")) {
+			lineage += ":"+inDate.getTime();
+		}
+		return lineage;
+	}
+
+    private String getCurrentLineage(RecordHeaders recordHeaders, String key) {
         Header header = recordHeaders.lastHeader(key);
 
         if(null == header) {
