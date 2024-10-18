@@ -81,7 +81,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
             key = transformerName;
         }
 
-        String lineage = getLineage(topicProduceData, recordHeaders, key);
+        String lineage = getLineage(topicProduceData, recordHeaders, key, inDate);
         setHeader(recordHeaders, key, lineage);
 
         Date outDate = new Date();
