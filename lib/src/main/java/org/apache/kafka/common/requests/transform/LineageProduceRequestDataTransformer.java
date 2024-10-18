@@ -101,15 +101,29 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
     }
 
     private String getLineage(ProduceRequestData.TopicProduceData topicProduceData, RecordHeaders recordHeaders, String key, Date inDate) {
-		String lineage = getCurrentLineage(recordHeaders, key)+lineagePrefix+topicProduceData.name();
+        String lineage = getCurrentLineage(recordHeaders, key)+lineagePrefix+topicProduceData.name();
         if(configured(recordHeaders, "in-time", "true")) {
-			lineage += ":"+inDate.getTime();
-		}
-		return lineage;
-	}
+            lineage += ":"+inDate.getTime();
+        }
+        return lineage;
+    }
 
     private String getCurrentLineage(RecordHeaders recordHeaders, String key) {
-        Header header = recordHeaders.lastHeader(key);
+        Header header = null;
+
+        String fromKeys = reqConfig(recordHeaders, "from-keys");
+        if(null != fromKeys) {
+            for(String fromKey : fromKeys.split("[\\s,]+")) {
+                header = recordHeaders.lastHeader(fromKey);
+                if(null != header) {
+                    break;
+                }
+            }
+        }
+
+        if(null == header) {
+            header = recordHeaders.lastHeader(key);
+        }
 
         if(null == header) {
             return "";
