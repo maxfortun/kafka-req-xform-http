@@ -16,7 +16,9 @@
  */
 package org.apache.kafka.common.requests.transform;
 
-import java.net.http.HttpResponse;
+import org.apache.hc.core5.http.HttpResponse;
+
+import org.apache.hc.core5.http.message.StatusLine;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +29,8 @@ public class HttpResponseException extends Exception {
     private HttpResponse httpResponse;
 
     public HttpResponseException(HttpResponse httpResponse) {
-        super(httpResponse.uri()+" returned "+httpResponse.statusCode());
+		StatusLine statusLine = new StatusLine(httpResponse);
+        super(httpResponse.uri()+" returned "+statusLine.getStatusCode());
         this.httpResponse = httpResponse;
     }
 }

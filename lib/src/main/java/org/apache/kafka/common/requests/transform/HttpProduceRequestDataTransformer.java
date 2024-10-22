@@ -18,9 +18,6 @@ package org.apache.kafka.common.requests.transform;
 
 import java.io.DataOutputStream;
 
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.net.URI;
 import java.net.URISyntaxException;
 
@@ -30,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +35,25 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
+
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+
+import org.apache.hc.core5.http.io.entity.ByteBufferEntity;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.SocketConfig;
+import org.apache.hc.core5.http.message.StatusLine;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.pool.PoolConcurrencyPolicy;
+import org.apache.hc.core5.pool.PoolReusePolicy;
+import org.apache.hc.core5.util.Timeout;
+import org.apache.hc.core5.util.TimeValue;
 
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.header.Header;
@@ -53,8 +70,9 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
     private final String brokerHostname;
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
-    private final Duration requestTimeout;
+	private final CloseableHttpClient httpClient;
+
+    private final Timeout requestTimeout;
 
     private final String envPattern;
 
@@ -65,10 +83,32 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
         String requestTimeoutString = appConfig("requestTimeout");
         if(null != requestTimeoutString) {
-            requestTimeout = Duration.parse(requestTimeoutString);
+            requestTimeout = Timeout.ofSeconds(Long.parseLong(requestTimeoutString));
         } else {
-            requestTimeout = null;
+            requestTimeout = Timeout.INFINITE;
         }
+
+		PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
+			.setDefaultSocketConfig(
+				SocketConfig.custom()
+				.setSoTimeout(requestTimeout)
+				.build()
+			)
+			.setPoolConcurrencyPolicy(PoolConcurrencyPolicy.STRICT)
+			.setConnPoolPolicy(PoolReusePolicy.LIFO)
+			.setDefaultConnectionConfig(
+				ConnectionConfig.custom()
+				.setSocketTimeout(requestTimeout)
+				.setConnectTimeout(requestTimeout)
+				.setTimeToLive(TimeValue.ofMinutes(10))
+				.build()
+			)
+			.build();
+
+
+		httpClient = HttpClients.custom()	
+			.setConnectionManager(connectionManager)	
+			.build();
 
         envPattern = appConfig("envPattern");
     }
@@ -110,10 +150,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
         Date inDate = new Date();
 
-        HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder().uri(new URI(reqConfig(recordHeaders, "uri")));
-        if(null != requestTimeout) {
-            httpRequestBuilder.timeout(requestTimeout);
-        }
+		HttpPost httpPost = new HttpPost(reqConfig(recordHeaders, "uri"));
 
         for(Header header : record.headers()) {
             String key = header.key();
@@ -124,7 +161,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             String value = Utils.utf8(header.value());
 
             try {
-                httpRequestBuilder.header(key, value);
+                httpPost.setHeader(key, value);
                 log.debug("{}: req header added {}={}", transformerName, key, value);
             } catch(java.lang.IllegalArgumentException e) {
                 log.debug("{}: req header added {}={}", transformerName, key, value, e);
@@ -136,39 +173,27 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             recordKey = Utils.utf8(record.key());
         }
         if(!org.apache.kafka.common.utils.Utils.isBlank(recordKey)) {
-            httpRequestBuilder.header(headerPrefix+"broker-message-key", recordKey);
+            httpPost.setHeader(headerPrefix+"broker-message-key", recordKey);
         }
 
-        httpRequestBuilder.header(headerPrefix+"broker-hostname", brokerHostname);
-        httpRequestBuilder.header(headerPrefix+"broker-topic-name", topicProduceData.name());
+        httpPost.setHeader(headerPrefix+"broker-hostname", brokerHostname);
+        httpPost.setHeader(headerPrefix+"broker-topic-name", topicProduceData.name());
 
-        ByteBuffer bodyByteBuffer = record.value();
-        int position = bodyByteBuffer.position();
-        int arrayOffset = bodyByteBuffer.arrayOffset();
-        log.trace("{}: req bodyByteBuffer {} {} {}", transformerName, position, arrayOffset, bodyByteBuffer.array());
-
-        byte[] bodyArray = new byte[bodyByteBuffer.remaining()];
-        bodyByteBuffer.get(bodyArray, 0, bodyArray.length); 
-        log.trace("{}: req bodyArray {} {}", transformerName, bodyArray.length, bodyArray);
-        log.debug("{}: req bodyArray String {} {}", transformerName, bodyArray.length, new String(bodyArray, StandardCharsets.UTF_8));
-
-        HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.ofByteArray(bodyArray);
-        log.trace("{}: bodyPublisher {}", transformerName, bodyPublisher);
-        httpRequestBuilder.POST(bodyPublisher);
+		httpPost.setEntity(new ByteBufferEntity(record.value(), ContentType.DEFAULT_BINARY));
 
         Date reqDate = new Date();
-        httpRequestBuilder.header(headerPrefix+"broker-req-time", ""+reqDate.getTime());
-
-        HttpRequest httpRequest = httpRequestBuilder.build();
-        log.debug("{}: httpRequest {}", transformerName, httpRequest);
+        httpPost.setHeader(headerPrefix+"broker-req-time", ""+reqDate.getTime());
 
         Map<String, List<String>> headersMap = new HashMap<>();
         byte[] body = new byte[0];
 
         if(configured(recordHeaders, "enable-send", "true")) {
-            HttpResponse<byte[]> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
+
+			ClassicHttpResponse httpResponse = httpClient.execute(httpPost);
+			StatusLine statusLine = new StatusLine(httpResponse);
+
             log.debug("{}: httpResponse {}", transformerName, httpResponse);
-            if(httpResponse.statusCode() != 200) {
+            if(statusLine.getStatusCode() != 200) {
                 String onHttpException = reqConfig(recordHeaders, "onHttpException");
 
                 if("original".equalsIgnoreCase(onHttpException)) {
@@ -179,7 +204,14 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                     throw new HttpResponseException(httpResponse);
                 }
             }
-            headersMap.putAll(httpResponse.headers().map());
+			for(org.apache.hc.core5.http.Header header : httpResponse.getHeaders()) {
+				List<String> values = headersMap.get(header.getName());
+				if(null == values) {
+					values = new ArrayList<String>();
+            		headersMap.put(header.getName(), values);
+				}
+            	values.add(header.getValue());
+			}
             body = httpResponse.body();
         }
 

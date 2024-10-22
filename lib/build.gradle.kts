@@ -32,6 +32,7 @@ dependencies {
 	implementation("org.apache.kafka:kafka-clients:${System.getenv("KAFKA_VERSION")}")
 	implementation("org.slf4j:slf4j-api:1.7.36")
 	implementation("org.slf4j:jul-to-slf4j:1.7.36")
+	implementation("org.apache.httpcomponents.client5:httpclient5:5.4")
 }
 
 testing {
