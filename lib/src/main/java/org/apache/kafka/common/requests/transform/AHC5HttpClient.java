@@ -85,7 +85,7 @@ public class AHC5HttpClient extends HttpClient {
 	}
 
     public HttpResponse send(AbstractHttpRequest httpRequest) throws Exception {
-		ClassicHttpResponse httpResponse = httpClient.execute(((AHC5HttpRequest)httpRequest).httpRequest());
+		ClassicHttpResponse httpResponse = httpClient.execute(((AHC5HttpRequest)httpRequest).httpRequest(), response -> response);
 		return new AHC5HttpResponse((AHC5HttpRequest)httpRequest, httpResponse);
 	}
 

@@ -47,12 +47,16 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
     private final HttpClient httpClient;
 
+    private final String headerPattern;
+
     private final String envPattern;
 
     public HttpProduceRequestDataTransformer(String transformerName) throws Exception {
         super(transformerName);
 
         brokerHostname = System.getenv("HOSTNAME"); 
+
+        headerPattern = appConfig("headerPattern");
 
         envPattern = appConfig("envPattern");
 
@@ -100,10 +104,17 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
         for(Header header : record.headers()) {
             String key = header.key();
+
             if(key.matches("(?i)^"+headerPrefix)) {
                 log.debug("{}: req header {} skipped, because it starts with the http header prefix {}", transformerName, key, headerPrefix);
                 continue;
             }
+
+            if(null != headerPattern && !key.matches(headerPattern)) {
+                log.debug("{}: req header {} skipped, because it does not match header pattern {}", transformerName, key, headerPattern);
+                continue;
+            }
+
             String value = Utils.utf8(header.value());
 
             try {
