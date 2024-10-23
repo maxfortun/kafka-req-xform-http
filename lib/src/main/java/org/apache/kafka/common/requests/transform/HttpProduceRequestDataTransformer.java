@@ -49,7 +49,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
     private final String envPattern;
 
-    public HttpProduceRequestDataTransformer(String transformerName) {
+    public HttpProduceRequestDataTransformer(String transformerName) throws Exception {
         super(transformerName);
 
         brokerHostname = System.getenv("HOSTNAME"); 

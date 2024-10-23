@@ -16,9 +16,34 @@
  */
 package org.apache.kafka.common.requests.transform;
 
+import java.lang.reflect.Constructor;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public abstract class HttpClient {
-    public static HttpClient newHttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
-		return null;
+    public static final Logger log = LoggerFactory.getLogger(HttpClient.class);
+
+	private final static Class[] httpClientConstructorParameterTypes = new Class[] {HttpProduceRequestDataTransformer.class};
+
+	protected HttpProduceRequestDataTransformer httpProduceRequestDataTransformer;
+	protected HttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
+		this.httpProduceRequestDataTransformer = httpProduceRequestDataTransformer;
+	}
+
+    public static HttpClient newHttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) throws Exception {
+		String httpClientClassName = httpProduceRequestDataTransformer.appConfig("httpClientClassName");
+
+		if(null == httpClientClassName) {
+			log.debug("Defaulting to {}.", JDKHttpClient.class);
+			return new JDKHttpClient(httpProduceRequestDataTransformer);
+		}
+
+		Class<?> httpClientClass = Class.forName(httpClientClassName);
+        Constructor<?> httpClientConstructor = httpClientClass.getConstructor(httpClientConstructorParameterTypes);
+        HttpClient httpClient = (HttpClient)httpClientConstructor.newInstance(new Object[] {httpProduceRequestDataTransformer});
+		log.debug("Using {}.", httpClient.getClass());
+		return httpClient;
 	}
 
 	public abstract HttpPostRequest newHttpPostRequest(String uri);
