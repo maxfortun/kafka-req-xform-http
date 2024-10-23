@@ -53,7 +53,7 @@ public class AHC5HttpResponse implements HttpResponse {
 		return statusLine.getStatusCode();
 	}
 
-    public Map<String, List<String>> headers() throws Exception {
+    public Map<String, List<String>> headers() {
 		Map<String, List<String>> headersMap = new HashMap<>();
         for(org.apache.hc.core5.http.Header header : httpResponse.getHeaders()) {
             List<String> values = headersMap.get(header.getName());
@@ -67,7 +67,7 @@ public class AHC5HttpResponse implements HttpResponse {
 		return headersMap;
 	}
 
-    public byte[] body() throws Exception {
+    public byte[] body() {
 		return body;
 	}
 }

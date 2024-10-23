@@ -22,6 +22,6 @@ import java.util.Map;
 public interface HttpResponse {
     public AbstractHttpRequest request();
     public int statusCode();
-    public Map<String, List<String>> headers() throws Exception;
-    public byte[] body() throws Exception;
+    public Map<String, List<String>> headers();
+    public byte[] body();
 }

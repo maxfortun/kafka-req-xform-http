@@ -46,13 +46,13 @@ public class JDKHttpResponse implements HttpResponse {
 		return httpResponse.statusCode();
 	}
 
-    public Map<String, List<String>> headers() throws Exception {
+    public Map<String, List<String>> headers() {
 		Map<String, List<String>> headersMap = new HashMap<>();
 		headersMap.putAll(httpResponse.headers().map());
 		return headersMap;
 	}
 
-    public byte[] body() throws Exception {
+    public byte[] body() {
 		return httpResponse.body();
 	}
 }

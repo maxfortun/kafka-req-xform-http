@@ -25,7 +25,7 @@ public class HttpResponseException extends Exception {
     private HttpResponse httpResponse;
 
     public HttpResponseException(HttpResponse httpResponse) {
-        super(httpResponse.request().uri()+" returned "+httpResponse.statusCode());
+        super(httpResponse.request().uri()+" returned "+httpResponse.statusCode()+"\n"+new String(httpResponse.body()));
         this.httpResponse = httpResponse;
     }
 }
