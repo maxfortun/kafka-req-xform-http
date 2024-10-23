@@ -30,7 +30,6 @@ import org.apache.hc.core5.http.io.SocketConfig;
 import org.apache.hc.core5.http.message.StatusLine;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.pool.PoolConcurrencyPolicy;
 import org.apache.hc.core5.pool.PoolReusePolicy;
 import org.apache.hc.core5.util.Timeout;
