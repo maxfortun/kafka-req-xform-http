@@ -35,14 +35,14 @@ public abstract class HttpClient {
 		String httpClientClassName = httpProduceRequestDataTransformer.appConfig("httpClient.class");
 
 		if(null == httpClientClassName) {
-			log.debug("Defaulting to {}.", JDKHttpClient.class);
+			log.info("Defaulting to {}.", JDKHttpClient.class);
 			return new JDKHttpClient(httpProduceRequestDataTransformer);
 		}
 
 		Class<?> httpClientClass = Class.forName(httpClientClassName);
         Constructor<?> httpClientConstructor = httpClientClass.getConstructor(httpClientConstructorParameterTypes);
         HttpClient httpClient = (HttpClient)httpClientConstructor.newInstance(new Object[] {httpProduceRequestDataTransformer});
-		log.debug("Using {}.", httpClient.getClass());
+		log.info("Using {}.", httpClient.getClass());
 		return httpClient;
 	}
 

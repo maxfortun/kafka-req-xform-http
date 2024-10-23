@@ -181,7 +181,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         Header[] headers = headers(headersMap);
 
         log.trace("{}: res body {}", transformerName, body.length, body);
-        log.debug("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
+        log.trace("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
 
         return newRecord(recordBatch, record, headers, body);
     }
