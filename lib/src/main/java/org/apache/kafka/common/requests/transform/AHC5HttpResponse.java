@@ -16,10 +16,11 @@
  */
 package org.apache.kafka.common.requests.transform;
 
-import java.nio.ByteBuffer;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.message.StatusLine;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 
-import java.net.URI;
-
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,15 +28,17 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JDKHttpResponse implements HttpResponse {
-    public static final Logger log = LoggerFactory.getLogger(JDKHttpResponse.class);
+public class AHC5HttpResponse implements HttpResponse {
+    public static final Logger log = LoggerFactory.getLogger(AHC5HttpResponse.class);
 
-	private JDKHttpRequest httpRequest;
-	private java.net.http.HttpResponse<byte[]> httpResponse;
+	private AHC5HttpRequest httpRequest;
+	private ClassicHttpResponse httpResponse;
+	private StatusLine statusLine;
 
-	public JDKHttpResponse(JDKHttpRequest httpRequest, java.net.http.HttpResponse<byte[]> httpResponse) {
+	public AHC5HttpResponse(AHC5HttpRequest httpRequest, ClassicHttpResponse httpResponse) {
 		this.httpRequest = httpRequest;
 		this.httpResponse = httpResponse;
+		statusLine = new StatusLine(httpResponse);
 	}
 
     public AbstractHttpRequest request() {
@@ -43,17 +46,25 @@ public class JDKHttpResponse implements HttpResponse {
 	}
 
     public int statusCode() {
-		return httpResponse.statusCode();
+		return statusLine.getStatusCode();
 	}
 
     public Map<String, List<String>> headers() throws Exception {
 		Map<String, List<String>> headersMap = new HashMap<>();
-		headersMap.putAll(httpResponse.headers().map());
+        for(org.apache.hc.core5.http.Header header : httpResponse.getHeaders()) {
+            List<String> values = headersMap.get(header.getName());
+            if(null == values) {
+                values = new ArrayList<String>();
+                headersMap.put(header.getName(), values);
+            }
+            values.add(header.getValue());
+        }
+
 		return headersMap;
 	}
 
     public byte[] body() throws Exception {
-		return httpResponse.body();
+		return EntityUtils.toByteArray(httpResponse.getEntity());
 	}
 }
 

@@ -17,7 +17,6 @@
 package org.apache.kafka.common.requests.transform;
 
 import java.net.URI;
-//import java.net.URISyntaxException;
 
 import java.time.Duration;
 
@@ -42,11 +41,11 @@ public class JDKHttpClient extends HttpClient {
         }
     }
 
-    public HttpRequest newHttpRequest() {
-		return new JDKHttpRequest();
+    public AbstractHttpRequest newHttpRequest(String uri) throws Exception {
+		return new JDKHttpRequest(uri);
 	}
 
-    public HttpResponse send(HttpRequest httpRequest) throws Exception {
+    public HttpResponse send(AbstractHttpRequest httpRequest) throws Exception {
     	java.net.http.HttpResponse<byte[]> httpResponse = httpClient.send(((JDKHttpRequest)httpRequest).httpRequest(), java.net.http.HttpResponse.BodyHandlers.ofByteArray());
 		return new JDKHttpResponse((JDKHttpRequest)httpRequest, httpResponse);
 	}

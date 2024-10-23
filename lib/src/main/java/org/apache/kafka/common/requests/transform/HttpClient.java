@@ -46,6 +46,6 @@ public abstract class HttpClient {
 		return httpClient;
 	}
 
-	public abstract HttpRequest newHttpRequest();
-	public abstract HttpResponse send(HttpRequest httpRequest) throws Exception;
+	public abstract AbstractHttpRequest newHttpRequest(String uri) throws Exception;
+	public abstract HttpResponse send(AbstractHttpRequest httpRequest) throws Exception;
 }

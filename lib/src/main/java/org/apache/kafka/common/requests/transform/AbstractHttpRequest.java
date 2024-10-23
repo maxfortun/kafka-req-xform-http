@@ -18,9 +18,17 @@ package org.apache.kafka.common.requests.transform;
 
 import java.nio.ByteBuffer;
 
-public interface HttpRequest {
-    public HttpRequest uri(String uri) throws Exception;
-    public String uri();
-    public HttpRequest header(String key, String value);
-	public HttpRequest body(String key, ByteBuffer byteBuffer);
+public abstract class AbstractHttpRequest {
+	private final String uri;
+
+    public AbstractHttpRequest(String uri) throws Exception {
+		this.uri = uri;
+	}
+
+    public String uri() {
+		return uri;
+	}
+
+    public abstract AbstractHttpRequest header(String key, String value);
+	public abstract AbstractHttpRequest body(String key, ByteBuffer byteBuffer);
 }

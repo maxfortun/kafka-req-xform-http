@@ -23,29 +23,23 @@ import java.net.URI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JDKHttpRequest implements HttpRequest {
+public class JDKHttpRequest extends AbstractHttpRequest {
     public static final Logger log = LoggerFactory.getLogger(JDKHttpRequest.class);
 
-	private String uri = null;
 	private java.net.http.HttpRequest.Builder httpRequestBuilder = java.net.http.HttpRequest.newBuilder();
 	private java.net.http.HttpRequest httpRequest = null;
 
-    public HttpRequest uri(String uri) throws Exception {
-		this.uri = uri;
+    public JDKHttpRequest(String uri) throws Exception {
+		super(uri);
 		httpRequestBuilder.uri(new URI(uri));
-		return this;
 	}
 
-    public String uri() {
-		return uri;
-	}
-
-    public HttpRequest header(String key, String value) {
+    public AbstractHttpRequest header(String key, String value) {
 		httpRequestBuilder.header(key, value);
 		return this;
 	}
 
-    public HttpRequest body(String key, ByteBuffer byteBuffer) {
+    public AbstractHttpRequest body(String key, ByteBuffer byteBuffer) {
         int position = byteBuffer.position();
         int arrayOffset = byteBuffer.arrayOffset();
 

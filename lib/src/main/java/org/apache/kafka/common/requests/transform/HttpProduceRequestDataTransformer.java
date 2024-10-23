@@ -96,7 +96,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
         Date inDate = new Date();
 
-        HttpRequest httpRequest = httpClient.newHttpRequest().uri(reqConfig(recordHeaders, "uri"));
+        AbstractHttpRequest httpRequest = httpClient.newHttpRequest(reqConfig(recordHeaders, "uri"));
 
         for(Header header : record.headers()) {
             String key = header.key();

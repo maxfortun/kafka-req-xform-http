@@ -18,42 +18,36 @@ package org.apache.kafka.common.requests.transform;
 
 import java.nio.ByteBuffer;
 
-import java.net.URI;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import org.apache.hc.core5.http.io.entity.ByteBufferEntity;
+import org.apache.hc.core5.http.ContentType;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JDKHttpResponse implements HttpResponse {
-    public static final Logger log = LoggerFactory.getLogger(JDKHttpResponse.class);
+public class AHC5HttpRequest extends AbstractHttpRequest {
+    public static final Logger log = LoggerFactory.getLogger(AHC5HttpRequest.class);
 
-	private JDKHttpRequest httpRequest;
-	private java.net.http.HttpResponse<byte[]> httpResponse;
+	private HttpPost httpRequest = null;
 
-	public JDKHttpResponse(JDKHttpRequest httpRequest, java.net.http.HttpResponse<byte[]> httpResponse) {
-		this.httpRequest = httpRequest;
-		this.httpResponse = httpResponse;
+    public AHC5HttpRequest(String uri) throws Exception {
+		super(uri);
+		httpRequest = new HttpPost(uri);
 	}
 
-    public AbstractHttpRequest request() {
+    public AbstractHttpRequest header(String key, String value) {
+		httpRequest.setHeader(key, value);
+		return this;
+	}
+
+    public AbstractHttpRequest body(String key, ByteBuffer byteBuffer) {
+		httpRequest.setEntity(new ByteBufferEntity(byteBuffer, ContentType.DEFAULT_BINARY));
+		return this;
+	}
+
+	public HttpPost httpRequest() {
 		return httpRequest;
-	}
-
-    public int statusCode() {
-		return httpResponse.statusCode();
-	}
-
-    public Map<String, List<String>> headers() throws Exception {
-		Map<String, List<String>> headersMap = new HashMap<>();
-		headersMap.putAll(httpResponse.headers().map());
-		return headersMap;
-	}
-
-    public byte[] body() throws Exception {
-		return httpResponse.body();
 	}
 }
 
