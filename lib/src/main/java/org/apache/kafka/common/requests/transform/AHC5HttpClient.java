@@ -43,30 +43,21 @@ public class AHC5HttpClient extends HttpClient {
 
     private final CloseableHttpClient httpClient;
 
-	private final Timeout requestTimeout;
-
     public AHC5HttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
         super(httpProduceRequestDataTransformer);
-
-        String requestTimeoutString = httpProduceRequestDataTransformer.appConfig("requestTimeout");
-        if(null != requestTimeoutString) {
-            requestTimeout = Timeout.ofSeconds(Long.parseLong(requestTimeoutString));
-        } else {
-            requestTimeout = Timeout.INFINITE;
-        }
 
         PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
             .setDefaultSocketConfig(
                 SocketConfig.custom()
-                .setSoTimeout(requestTimeout)
+                .setSoTimeout(appTimeout("soTimeout"))
                 .build()
             )
             .setPoolConcurrencyPolicy(PoolConcurrencyPolicy.STRICT)
             .setConnPoolPolicy(PoolReusePolicy.LIFO)
             .setDefaultConnectionConfig(
                 ConnectionConfig.custom()
-                .setSocketTimeout(requestTimeout)
-                .setConnectTimeout(requestTimeout)
+                .setSocketTimeout(appTimeout("socketTimeout"))
+                .setConnectTimeout(appTimeout("connectTimeout"))
                 .setTimeToLive(TimeValue.ofMinutes(10))
                 .build()
             )
@@ -78,6 +69,16 @@ public class AHC5HttpClient extends HttpClient {
             .build();
 
     }
+
+	private Timeout appTimeout(String key) {
+        String string = httpProduceRequestDataTransformer.appConfig("httpClient."+key);
+        if(null == string) {
+            return Timeout.INFINITE;
+        }
+        Timeout timeout = Timeout.ofSeconds(Long.parseLong(string));
+		log.debug("{}: {}={}", httpProduceRequestDataTransformer.transformerName, key, timeout);
+		return timeout;
+	}
 
     public AbstractHttpRequest newHttpRequest(String uri) throws Exception {
 		return new AHC5HttpRequest(this, uri);
