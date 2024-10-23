@@ -193,15 +193,17 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
                         Record transformedRecord = transform(topicProduceData, partitionProduceData, recordBatch, record, new RecordHeaders(record.headers()), version);
                         memoryRecordsBuilder.append(transformedRecord);
 
-                        log.debug("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
-                            transformerName, batchId, recordId, record,
-                            Utils.toString(record.headers()), Utils.utf8(record.key()), Utils.utf8(record.value())
-                        );
+						if(log.isTraceEnabled()) {
+                        	log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
+                            	transformerName, batchId, recordId, record,
+                            	Utils.toString(record.headers()), Utils.utf8(record.key()), Utils.utf8(record.value())
+                        	);
 
-                        log.debug("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] out:\n{}\n{}  B:{}={}",
-                            transformerName, batchId, recordId, transformedRecord,
-                            Utils.toString(transformedRecord.headers()), Utils.utf8(transformedRecord.key()), Utils.utf8(transformedRecord.value())
-                        );
+                        	log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] out:\n{}\n{}  B:{}={}",
+                            	transformerName, batchId, recordId, transformedRecord,
+                            	Utils.toString(transformedRecord.headers()), Utils.utf8(transformedRecord.key()), Utils.utf8(transformedRecord.value())
+                        	);
+						}
 
                         recordId++;
                     }
