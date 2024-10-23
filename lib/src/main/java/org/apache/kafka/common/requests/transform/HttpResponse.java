@@ -16,17 +16,12 @@
  */
 package org.apache.kafka.common.requests.transform;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.List;
+import java.util.Map;
 
-public class HttpResponseException extends Exception {
-    public static final Logger log = LoggerFactory.getLogger(HttpResponseException.class);
-
-    private HttpResponse httpResponse;
-
-    public HttpResponseException(HttpResponse httpResponse) {
-        super(httpResponse.request().uri()+" returned "+httpResponse.statusCode());
-        this.httpResponse = httpResponse;
-    }
+public interface HttpResponse {
+    public HttpRequest request();
+    public int statusCode();
+    public Map<String, List<String>> headers();
+    public byte[] body();
 }
-

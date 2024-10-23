@@ -16,17 +16,8 @@
  */
 package org.apache.kafka.common.requests.transform;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.nio.ByteBuffer;
 
-public class HttpResponseException extends Exception {
-    public static final Logger log = LoggerFactory.getLogger(HttpResponseException.class);
-
-    private HttpResponse httpResponse;
-
-    public HttpResponseException(HttpResponse httpResponse) {
-        super(httpResponse.request().uri()+" returned "+httpResponse.statusCode());
-        this.httpResponse = httpResponse;
-    }
+public interface HttpPostRequest extends HttpRequest {
+    public HttpPostRequest body(String key, ByteBuffer byteBuffer);
 }
-
