@@ -30,6 +30,7 @@ import org.apache.hc.core5.http.io.SocketConfig;
 import org.apache.hc.core5.http.message.StatusLine;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.pool.PoolConcurrencyPolicy;
 import org.apache.hc.core5.pool.PoolReusePolicy;
 import org.apache.hc.core5.util.Timeout;
@@ -85,7 +86,12 @@ public class AHC5HttpClient extends HttpClient {
 	}
 
     public HttpResponse send(AbstractHttpRequest httpRequest) throws Exception {
-		ClassicHttpResponse httpResponse = httpClient.execute(((AHC5HttpRequest)httpRequest).httpRequest(), response -> { return response; });
+		ClassicHttpResponse httpResponse = httpClient.execute(((AHC5HttpRequest)httpRequest).httpRequest(), response -> { 
+			HttpEntity httpEntity = response.getEntity();
+			EntityUtils.consume(httpEntity);
+			return response;
+		});
+
 		return new AHC5HttpResponse((AHC5HttpRequest)httpRequest, httpResponse);
 	}
 
