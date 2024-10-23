@@ -32,7 +32,7 @@ public abstract class HttpClient {
 	}
 
     public static HttpClient newHttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) throws Exception {
-		String httpClientClassName = httpProduceRequestDataTransformer.appConfig("httpClientClassName");
+		String httpClientClassName = httpProduceRequestDataTransformer.appConfig("httpClient.class");
 
 		if(null == httpClientClassName) {
 			log.debug("Defaulting to {}.", JDKHttpClient.class);
