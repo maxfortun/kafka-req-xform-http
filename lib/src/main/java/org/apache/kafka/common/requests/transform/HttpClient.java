@@ -29,6 +29,7 @@ public abstract class HttpClient {
 	protected HttpProduceRequestDataTransformer httpProduceRequestDataTransformer;
 	protected HttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
 		this.httpProduceRequestDataTransformer = httpProduceRequestDataTransformer;
+		log.info("{}: {}", httpProduceRequestDataTransformer.transformerName, getClass().getName());
 	}
 
     public static HttpClient newHttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) throws Exception {

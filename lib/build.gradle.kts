@@ -48,3 +48,11 @@ testing {
 task("copyDependencies", Copy::class) {
 	from(configurations.runtimeClasspath).into("dependencies")
 }
+
+afterEvaluate {
+	tasks.withType(JavaCompile::class) {
+		options.compilerArgs.add("-Xlint:unchecked")
+		options.compilerArgs.add("-Xlint:deprecation")
+	}
+}
+
