@@ -42,8 +42,8 @@ public class JDKHttpClient extends HttpClient {
         }
     }
 
-    public HttpPostRequest newHttpPostRequest(String uri) {
-		return new JDKHttpPostRequest(uri);
+    public HttpRequest newHttpRequest() {
+		return new JDKHttpRequest();
 	}
 
     public HttpResponse send(HttpRequest httpRequest) {

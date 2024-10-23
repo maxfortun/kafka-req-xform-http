@@ -46,6 +46,6 @@ public abstract class HttpClient {
 		return httpClient;
 	}
 
-	public abstract HttpPostRequest newHttpPostRequest(String uri);
+	public abstract HttpRequest newHttpRequest();
 	public abstract HttpResponse send(HttpRequest httpRequest);
 }

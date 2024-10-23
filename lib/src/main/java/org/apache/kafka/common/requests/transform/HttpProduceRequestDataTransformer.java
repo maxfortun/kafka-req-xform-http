@@ -96,7 +96,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
         Date inDate = new Date();
 
-        HttpPostRequest httpPostRequest = httpClient.newHttpPostRequest(reqConfig(recordHeaders, "uri"));
+        HttpRequest httpRequest = httpClient.newHttpRequest().uri(reqConfig(recordHeaders, "uri"));
 
         for(Header header : record.headers()) {
             String key = header.key();
@@ -107,30 +107,30 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             String value = Utils.utf8(header.value());
 
             try {
-                httpPostRequest.header(key, value);
+                httpRequest.header(key, value);
                 log.debug("{}: req header added {}={}", transformerName, key, value);
             } catch(java.lang.IllegalArgumentException e) {
                 log.debug("{}: req header added {}={}", transformerName, key, value, e);
             }
         }
 
-        httpPostRequest.header(headerPrefix+"broker-hostname", brokerHostname);
-        httpPostRequest.header(headerPrefix+"broker-topic-name", topicProduceData.name());
+        httpRequest.header(headerPrefix+"broker-hostname", brokerHostname);
+        httpRequest.header(headerPrefix+"broker-topic-name", topicProduceData.name());
 
         String recordKey = null;
         if(null != record.key()) {
             recordKey = Utils.utf8(record.key());
         }
-		httpPostRequest.body(recordKey, record.value());
+		httpRequest.body(recordKey, record.value());
 
         Date reqDate = new Date();
-        httpPostRequest.header(headerPrefix+"broker-req-time", ""+reqDate.getTime());
+        httpRequest.header(headerPrefix+"broker-req-time", ""+reqDate.getTime());
 
         Map<String, List<String>> headersMap = new HashMap<>();
         byte[] body = new byte[0];
 
         if(configured(recordHeaders, "enable-send", "true")) {
-            HttpResponse httpResponse = httpClient.send(httpPostRequest);
+            HttpResponse httpResponse = httpClient.send(httpRequest);
             log.debug("{}: httpResponse {}", transformerName, httpResponse);
             if(httpResponse.statusCode() != 200) {
                 String onHttpException = reqConfig(recordHeaders, "onHttpException");
