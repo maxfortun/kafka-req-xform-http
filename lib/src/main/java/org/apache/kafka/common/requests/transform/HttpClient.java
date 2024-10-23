@@ -47,5 +47,5 @@ public abstract class HttpClient {
 	}
 
 	public abstract HttpRequest newHttpRequest();
-	public abstract HttpResponse send(HttpRequest httpRequest);
+	public abstract HttpResponse send(HttpRequest httpRequest) throws Exception;
 }

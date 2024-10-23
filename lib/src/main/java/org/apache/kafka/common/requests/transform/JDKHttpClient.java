@@ -46,9 +46,9 @@ public class JDKHttpClient extends HttpClient {
 		return new JDKHttpRequest();
 	}
 
-    public HttpResponse send(HttpRequest httpRequest) {
+    public HttpResponse send(HttpRequest httpRequest) throws Exception {
     	java.net.http.HttpResponse<byte[]> httpResponse = httpClient.send(((JDKHttpRequest)httpRequest).httpRequest(), java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-		return new JDKHttpResponse(httpResponse);
+		return new JDKHttpResponse((JDKHttpRequest)httpRequest, httpResponse);
 	}
 
 }
