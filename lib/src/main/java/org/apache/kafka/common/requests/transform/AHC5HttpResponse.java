@@ -20,6 +20,8 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.message.StatusLine;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 
+import java.io.IOException;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,14 +33,16 @@ import org.slf4j.LoggerFactory;
 public class AHC5HttpResponse implements HttpResponse {
     public static final Logger log = LoggerFactory.getLogger(AHC5HttpResponse.class);
 
-	private AHC5HttpRequest httpRequest;
-	private ClassicHttpResponse httpResponse;
-	private StatusLine statusLine;
+	private final AHC5HttpRequest httpRequest;
+	private final ClassicHttpResponse httpResponse;
+	private final StatusLine statusLine;
+	private final byte[] body;
 
-	public AHC5HttpResponse(AHC5HttpRequest httpRequest, ClassicHttpResponse httpResponse) {
+	public AHC5HttpResponse(AHC5HttpRequest httpRequest, ClassicHttpResponse httpResponse) throws IOException {
 		this.httpRequest = httpRequest;
 		this.httpResponse = httpResponse;
 		statusLine = new StatusLine(httpResponse);
+		body = EntityUtils.toByteArray(httpResponse.getEntity());
 	}
 
     public AbstractHttpRequest request() {
@@ -64,7 +68,7 @@ public class AHC5HttpResponse implements HttpResponse {
 	}
 
     public byte[] body() throws Exception {
-		return EntityUtils.toByteArray(httpResponse.getEntity());
+		return body;
 	}
 }
 
