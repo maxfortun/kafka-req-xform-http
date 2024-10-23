@@ -42,7 +42,7 @@ public class JDKHttpClient extends HttpClient {
     }
 
     public AbstractHttpRequest newHttpRequest(String uri) throws Exception {
-		return new JDKHttpRequest(uri);
+		return new JDKHttpRequest(this, uri);
 	}
 
     public HttpResponse send(AbstractHttpRequest httpRequest) throws Exception {

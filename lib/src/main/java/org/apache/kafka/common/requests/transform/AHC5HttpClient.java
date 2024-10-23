@@ -80,7 +80,7 @@ public class AHC5HttpClient extends HttpClient {
     }
 
     public AbstractHttpRequest newHttpRequest(String uri) throws Exception {
-		return new AHC5HttpRequest(uri);
+		return new AHC5HttpRequest(this, uri);
 	}
 
     public HttpResponse send(AbstractHttpRequest httpRequest) throws Exception {

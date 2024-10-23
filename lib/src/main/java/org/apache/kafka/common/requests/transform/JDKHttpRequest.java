@@ -26,11 +26,15 @@ import org.slf4j.LoggerFactory;
 public class JDKHttpRequest extends AbstractHttpRequest {
     public static final Logger log = LoggerFactory.getLogger(JDKHttpRequest.class);
 
-	private java.net.http.HttpRequest.Builder httpRequestBuilder = java.net.http.HttpRequest.newBuilder();
-	private java.net.http.HttpRequest httpRequest = null;
+	private JDKHttpClient httpClient;
+	private String headerPrefix;
 
-    public JDKHttpRequest(String uri) throws Exception {
+	private java.net.http.HttpRequest.Builder httpRequestBuilder = java.net.http.HttpRequest.newBuilder();
+
+    public JDKHttpRequest(JDKHttpClient httpClient, String uri) throws Exception {
 		super(uri);
+		this.httpClient = httpClient;
+		headerPrefix = httpClient.httpProduceRequestDataTransformer.headerPrefix;
 		httpRequestBuilder.uri(new URI(uri));
 	}
 
@@ -40,6 +44,10 @@ public class JDKHttpRequest extends AbstractHttpRequest {
 	}
 
     public AbstractHttpRequest body(String key, ByteBuffer byteBuffer) {
+        if(!org.apache.kafka.common.utils.Utils.isBlank(key)) {
+            header(headerPrefix+"broker-message-key", key);
+        }
+
         int position = byteBuffer.position();
         int arrayOffset = byteBuffer.arrayOffset();
 
@@ -53,7 +61,7 @@ public class JDKHttpRequest extends AbstractHttpRequest {
 	}
 
 	public java.net.http.HttpRequest httpRequest() {
-		return httpRequest;
+		return httpRequestBuilder.build();
 	}
 }
 
