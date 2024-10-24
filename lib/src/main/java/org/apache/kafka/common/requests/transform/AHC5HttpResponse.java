@@ -19,6 +19,7 @@ package org.apache.kafka.common.requests.transform;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.message.StatusLine;
 import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.HttpEntity;
 
 import java.io.IOException;
 
@@ -42,7 +43,16 @@ public class AHC5HttpResponse implements HttpResponse {
         this.httpRequest = httpRequest;
         this.httpResponse = httpResponse;
         statusLine = new StatusLine(httpResponse);
-        body = EntityUtils.toByteArray(httpResponse.getEntity());
+        try {
+            HttpEntity httpEntity = httpResponse.getEntity();
+            if (httpEntity != null) {
+                body = EntityUtils.toByteArray(httpEntity);
+            } else {
+                body = new byte[0];
+            }
+        } finally {
+            httpResponse.close();
+        }
     }
 
     public AbstractHttpRequest request() {
