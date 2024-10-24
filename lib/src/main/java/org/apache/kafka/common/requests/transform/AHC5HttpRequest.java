@@ -29,33 +29,33 @@ import org.slf4j.LoggerFactory;
 public class AHC5HttpRequest extends AbstractHttpRequest {
     public static final Logger log = LoggerFactory.getLogger(AHC5HttpRequest.class);
 
-	private AHC5HttpClient httpClient;
-	private String headerPrefix;
-	private HttpPost httpRequest;
+    private AHC5HttpClient httpClient;
+    private String headerPrefix;
+    private HttpPost httpRequest;
 
     public AHC5HttpRequest(AHC5HttpClient httpClient, String uri) throws Exception {
-		super(uri);
-		this.httpClient = httpClient;
-		headerPrefix = httpClient.httpProduceRequestDataTransformer.headerPrefix;
-		httpRequest = new HttpPost(uri);
-	}
+        super(uri);
+        this.httpClient = httpClient;
+        headerPrefix = httpClient.httpProduceRequestDataTransformer.headerPrefix;
+        httpRequest = new HttpPost(uri);
+    }
 
     public AbstractHttpRequest header(String key, String value) {
-		httpRequest.setHeader(key, value);
-		return this;
-	}
+        httpRequest.setHeader(key, value);
+        return this;
+    }
 
     public AbstractHttpRequest body(String key, ByteBuffer byteBuffer) {
-		if(!org.apache.kafka.common.utils.Utils.isBlank(key)) {
-			header(headerPrefix+"broker-message-key", key);
-		}
+        if(!org.apache.kafka.common.utils.Utils.isBlank(key)) {
+            header(headerPrefix+"broker-message-key", key);
+        }
 
-		httpRequest.setEntity(new ByteBufferEntity(byteBuffer, ContentType.DEFAULT_BINARY));
-		return this;
-	}
+        httpRequest.setEntity(new ByteBufferEntity(byteBuffer, ContentType.DEFAULT_BINARY));
+        return this;
+    }
 
-	public HttpPost httpRequest() {
-		return httpRequest;
-	}
+    public HttpPost httpRequest() {
+        return httpRequest;
+    }
 }
 

@@ -24,29 +24,29 @@ import org.slf4j.LoggerFactory;
 public abstract class HttpClient {
     public static final Logger log = LoggerFactory.getLogger(HttpClient.class);
 
-	private final static Class[] httpClientConstructorParameterTypes = new Class[] {HttpProduceRequestDataTransformer.class};
+    private final static Class[] httpClientConstructorParameterTypes = new Class[] {HttpProduceRequestDataTransformer.class};
 
-	protected HttpProduceRequestDataTransformer httpProduceRequestDataTransformer;
-	protected HttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
-		this.httpProduceRequestDataTransformer = httpProduceRequestDataTransformer;
-		log.info("{}: {}", httpProduceRequestDataTransformer.transformerName, getClass().getName());
-	}
+    protected HttpProduceRequestDataTransformer httpProduceRequestDataTransformer;
+    protected HttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
+        this.httpProduceRequestDataTransformer = httpProduceRequestDataTransformer;
+        log.info("{}: {}", httpProduceRequestDataTransformer.transformerName, getClass().getName());
+    }
 
     public static HttpClient newHttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) throws Exception {
-		String httpClientClassName = httpProduceRequestDataTransformer.appConfig("httpClient.class");
+        String httpClientClassName = httpProduceRequestDataTransformer.appConfig("httpClient.class");
 
-		if(null == httpClientClassName) {
-			log.info("Defaulting to {}.", JDKHttpClient.class);
-			return new JDKHttpClient(httpProduceRequestDataTransformer);
-		}
+        if(null == httpClientClassName) {
+            log.info("Defaulting to {}.", JDKHttpClient.class);
+            return new JDKHttpClient(httpProduceRequestDataTransformer);
+        }
 
-		Class<?> httpClientClass = Class.forName(httpClientClassName);
+        Class<?> httpClientClass = Class.forName(httpClientClassName);
         Constructor<?> httpClientConstructor = httpClientClass.getConstructor(httpClientConstructorParameterTypes);
         HttpClient httpClient = (HttpClient)httpClientConstructor.newInstance(new Object[] {httpProduceRequestDataTransformer});
-		log.info("Using {}.", httpClient.getClass());
-		return httpClient;
-	}
+        log.info("Using {}.", httpClient.getClass());
+        return httpClient;
+    }
 
-	public abstract AbstractHttpRequest newHttpRequest(String uri) throws Exception;
-	public abstract HttpResponse send(AbstractHttpRequest httpRequest) throws Exception;
+    public abstract AbstractHttpRequest newHttpRequest(String uri) throws Exception;
+    public abstract HttpResponse send(AbstractHttpRequest httpRequest) throws Exception;
 }

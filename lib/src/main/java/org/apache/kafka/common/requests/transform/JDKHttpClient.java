@@ -42,13 +42,13 @@ public class JDKHttpClient extends HttpClient {
     }
 
     public AbstractHttpRequest newHttpRequest(String uri) throws Exception {
-		return new JDKHttpRequest(this, uri);
-	}
+        return new JDKHttpRequest(this, uri);
+    }
 
     public HttpResponse send(AbstractHttpRequest httpRequest) throws Exception {
-    	java.net.http.HttpResponse<byte[]> httpResponse = httpClient.send(((JDKHttpRequest)httpRequest).httpRequest(), java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-		return new JDKHttpResponse((JDKHttpRequest)httpRequest, httpResponse);
-	}
+        java.net.http.HttpResponse<byte[]> httpResponse = httpClient.send(((JDKHttpRequest)httpRequest).httpRequest(), java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+        return new JDKHttpResponse((JDKHttpRequest)httpRequest, httpResponse);
+    }
 
 }
 

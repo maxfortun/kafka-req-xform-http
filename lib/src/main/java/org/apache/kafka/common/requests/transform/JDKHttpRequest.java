@@ -26,22 +26,22 @@ import org.slf4j.LoggerFactory;
 public class JDKHttpRequest extends AbstractHttpRequest {
     public static final Logger log = LoggerFactory.getLogger(JDKHttpRequest.class);
 
-	private JDKHttpClient httpClient;
-	private String headerPrefix;
+    private JDKHttpClient httpClient;
+    private String headerPrefix;
 
-	private java.net.http.HttpRequest.Builder httpRequestBuilder = java.net.http.HttpRequest.newBuilder();
+    private java.net.http.HttpRequest.Builder httpRequestBuilder = java.net.http.HttpRequest.newBuilder();
 
     public JDKHttpRequest(JDKHttpClient httpClient, String uri) throws Exception {
-		super(uri);
-		this.httpClient = httpClient;
-		headerPrefix = httpClient.httpProduceRequestDataTransformer.headerPrefix;
-		httpRequestBuilder.uri(new URI(uri));
-	}
+        super(uri);
+        this.httpClient = httpClient;
+        headerPrefix = httpClient.httpProduceRequestDataTransformer.headerPrefix;
+        httpRequestBuilder.uri(new URI(uri));
+    }
 
     public AbstractHttpRequest header(String key, String value) {
-		httpRequestBuilder.header(key, value);
-		return this;
-	}
+        httpRequestBuilder.header(key, value);
+        return this;
+    }
 
     public AbstractHttpRequest body(String key, ByteBuffer byteBuffer) {
         if(!org.apache.kafka.common.utils.Utils.isBlank(key)) {
@@ -57,11 +57,11 @@ public class JDKHttpRequest extends AbstractHttpRequest {
         java.net.http.HttpRequest.BodyPublisher bodyPublisher = java.net.http.HttpRequest.BodyPublishers.ofByteArray(array);
         httpRequestBuilder.POST(bodyPublisher);
 
-		return this;
-	}
+        return this;
+    }
 
-	public java.net.http.HttpRequest httpRequest() {
-		return httpRequestBuilder.build();
-	}
+    public java.net.http.HttpRequest httpRequest() {
+        return httpRequestBuilder.build();
+    }
 }
 

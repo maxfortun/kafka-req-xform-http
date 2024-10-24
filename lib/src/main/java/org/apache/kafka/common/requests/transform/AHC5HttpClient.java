@@ -70,25 +70,25 @@ public class AHC5HttpClient extends HttpClient {
 
     }
 
-	private Timeout appTimeout(String key) {
+    private Timeout appTimeout(String key) {
         String string = httpProduceRequestDataTransformer.appConfig("httpClient."+key);
         if(null == string) {
             return Timeout.INFINITE;
         }
         Timeout timeout = Timeout.ofSeconds(Long.parseLong(string));
-		log.debug("{}: {}={}", httpProduceRequestDataTransformer.transformerName, key, timeout);
-		return timeout;
-	}
+        log.debug("{}: {}={}", httpProduceRequestDataTransformer.transformerName, key, timeout);
+        return timeout;
+    }
 
     public AbstractHttpRequest newHttpRequest(String uri) throws Exception {
-		return new AHC5HttpRequest(this, uri);
-	}
+        return new AHC5HttpRequest(this, uri);
+    }
 
     public HttpResponse send(AbstractHttpRequest httpRequest) throws Exception {
-		return httpClient.execute(((AHC5HttpRequest)httpRequest).httpRequest(), httpResponse -> { 
-			return new AHC5HttpResponse((AHC5HttpRequest)httpRequest, httpResponse);
-		});
-	}
+        return httpClient.execute(((AHC5HttpRequest)httpRequest).httpRequest(), httpResponse -> { 
+            return new AHC5HttpResponse((AHC5HttpRequest)httpRequest, httpResponse);
+        });
+    }
 
 }
 

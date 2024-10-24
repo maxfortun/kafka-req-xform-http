@@ -30,30 +30,30 @@ import org.slf4j.LoggerFactory;
 public class JDKHttpResponse implements HttpResponse {
     public static final Logger log = LoggerFactory.getLogger(JDKHttpResponse.class);
 
-	private JDKHttpRequest httpRequest;
-	private java.net.http.HttpResponse<byte[]> httpResponse;
+    private JDKHttpRequest httpRequest;
+    private java.net.http.HttpResponse<byte[]> httpResponse;
 
-	public JDKHttpResponse(JDKHttpRequest httpRequest, java.net.http.HttpResponse<byte[]> httpResponse) {
-		this.httpRequest = httpRequest;
-		this.httpResponse = httpResponse;
-	}
+    public JDKHttpResponse(JDKHttpRequest httpRequest, java.net.http.HttpResponse<byte[]> httpResponse) {
+        this.httpRequest = httpRequest;
+        this.httpResponse = httpResponse;
+    }
 
     public AbstractHttpRequest request() {
-		return httpRequest;
-	}
+        return httpRequest;
+    }
 
     public int statusCode() {
-		return httpResponse.statusCode();
-	}
+        return httpResponse.statusCode();
+    }
 
     public Map<String, List<String>> headers() {
-		Map<String, List<String>> headersMap = new HashMap<>();
-		headersMap.putAll(httpResponse.headers().map());
-		return headersMap;
-	}
+        Map<String, List<String>> headersMap = new HashMap<>();
+        headersMap.putAll(httpResponse.headers().map());
+        return headersMap;
+    }
 
     public byte[] body() {
-		return httpResponse.body();
-	}
+        return httpResponse.body();
+    }
 }
 

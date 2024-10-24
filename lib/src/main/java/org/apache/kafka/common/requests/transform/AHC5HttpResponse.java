@@ -33,28 +33,28 @@ import org.slf4j.LoggerFactory;
 public class AHC5HttpResponse implements HttpResponse {
     public static final Logger log = LoggerFactory.getLogger(AHC5HttpResponse.class);
 
-	private final AHC5HttpRequest httpRequest;
-	private final ClassicHttpResponse httpResponse;
-	private final StatusLine statusLine;
-	private final byte[] body;
+    private final AHC5HttpRequest httpRequest;
+    private final ClassicHttpResponse httpResponse;
+    private final StatusLine statusLine;
+    private final byte[] body;
 
-	public AHC5HttpResponse(AHC5HttpRequest httpRequest, ClassicHttpResponse httpResponse) throws IOException {
-		this.httpRequest = httpRequest;
-		this.httpResponse = httpResponse;
-		statusLine = new StatusLine(httpResponse);
-		body = EntityUtils.toByteArray(httpResponse.getEntity());
-	}
+    public AHC5HttpResponse(AHC5HttpRequest httpRequest, ClassicHttpResponse httpResponse) throws IOException {
+        this.httpRequest = httpRequest;
+        this.httpResponse = httpResponse;
+        statusLine = new StatusLine(httpResponse);
+        body = EntityUtils.toByteArray(httpResponse.getEntity());
+    }
 
     public AbstractHttpRequest request() {
-		return httpRequest;
-	}
+        return httpRequest;
+    }
 
     public int statusCode() {
-		return statusLine.getStatusCode();
-	}
+        return statusLine.getStatusCode();
+    }
 
     public Map<String, List<String>> headers() {
-		Map<String, List<String>> headersMap = new HashMap<>();
+        Map<String, List<String>> headersMap = new HashMap<>();
         for(org.apache.hc.core5.http.Header header : httpResponse.getHeaders()) {
             List<String> values = headersMap.get(header.getName());
             if(null == values) {
@@ -64,11 +64,11 @@ public class AHC5HttpResponse implements HttpResponse {
             values.add(header.getValue());
         }
 
-		return headersMap;
-	}
+        return headersMap;
+    }
 
     public byte[] body() {
-		return body;
-	}
+        return body;
+    }
 }
 

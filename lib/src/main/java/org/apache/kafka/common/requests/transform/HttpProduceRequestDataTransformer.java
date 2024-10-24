@@ -60,7 +60,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         transientHeadersPattern = appConfig("headers.transientPattern");
         envHeadersPattern = appConfig("headers.envPattern");
 
-		httpClient = HttpClient.newHttpClient(this);
+        httpClient = HttpClient.newHttpClient(this);
     }
 
     protected Record transform(
@@ -115,18 +115,18 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             String value = Utils.utf8(header.value());
 
             if(null == persistentHeadersPattern || key.matches(persistentHeadersPattern)) {
-            	try {
-                	httpRequest.header(key, value);
-               		log.debug("{}: persistent header added to request {}={}", transformerName, key, value);
-            	} catch(java.lang.IllegalArgumentException e) {
-                	log.debug("{}: persistent header not added to request {}={}", transformerName, key, value, e);
-				}
-			}
+                try {
+                    httpRequest.header(key, value);
+                    log.debug("{}: persistent header added to request {}={}", transformerName, key, value);
+                } catch(java.lang.IllegalArgumentException e) {
+                    log.debug("{}: persistent header not added to request {}={}", transformerName, key, value, e);
+                }
+            }
 
             if(null != transientHeadersPattern && key.matches(transientHeadersPattern)) {
-            	resHeadersMap.put(key, Arrays.asList(value));
-               	log.debug("{}: transient header retained for response {}={}", transformerName, key, value);
-			}
+                resHeadersMap.put(key, Arrays.asList(value));
+                log.debug("{}: transient header retained for response {}={}", transformerName, key, value);
+            }
         }
 
         httpRequest.header(headerPrefix+"broker-hostname", brokerHostname);
@@ -136,7 +136,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         if(null != record.key()) {
             recordKey = Utils.utf8(record.key());
         }
-		httpRequest.body(recordKey, record.value());
+        httpRequest.body(recordKey, record.value());
 
         Date reqDate = new Date();
         httpRequest.header(headerPrefix+"broker-req-time", ""+reqDate.getTime());
@@ -172,9 +172,9 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
 
         if(null != envHeadersPattern && configured(recordHeaders, "in-headers", "env")) {
-			System.getenv().entrySet().stream()
-				.filter( entry -> entry.getKey().matches(envHeadersPattern) )
-            	.forEach( entry -> resHeadersMap.put(headerPrefix+"broker-env-"+entry.getKey().replaceAll("_","-"), Arrays.asList(entry.getValue())) );
+            System.getenv().entrySet().stream()
+                .filter( entry -> entry.getKey().matches(envHeadersPattern) )
+                .forEach( entry -> resHeadersMap.put(headerPrefix+"broker-env-"+entry.getKey().replaceAll("_","-"), Arrays.asList(entry.getValue())) );
         }
 
         Date outDate = new Date();

@@ -28,16 +28,16 @@ public class Utils {
     public static final Logger log = LoggerFactory.getLogger(Utils.class);
 
     public static String utf8(byte[] bytes) {
-		if(null == bytes) {
-			return null;
-		}
+        if(null == bytes) {
+            return null;
+        }
         return org.apache.kafka.common.utils.Utils.utf8(bytes);
     }
 
     public static String utf8(ByteBuffer byteBuffer) {
-		if(null == byteBuffer) {
-			return null;
-		}
+        if(null == byteBuffer) {
+            return null;
+        }
         return org.apache.kafka.common.utils.Utils.utf8(byteBuffer);
     }
 
