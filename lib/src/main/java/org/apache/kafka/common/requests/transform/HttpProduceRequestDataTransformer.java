@@ -147,7 +147,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             HttpResponse httpResponse = httpClient.send(httpRequest);
             log.debug("{}: httpResponse {}", transformerName, httpResponse);
             if(httpResponse.statusCode() != 200) {
-                String onHttpException = reqConfig(recordHeaders, "onHttpException");
+                String onHttpException = reqConfig(recordHeaders, "httpClient.onException");
 
                 if("original".equalsIgnoreCase(onHttpException)) {
                     return record;
