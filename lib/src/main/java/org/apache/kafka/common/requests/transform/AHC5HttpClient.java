@@ -52,7 +52,7 @@ public class AHC5HttpClient extends HttpClient {
                 .setSoTimeout(appTimeout("soTimeout"))
                 .build()
             )
-            .setPoolConcurrencyPolicy(PoolConcurrencyPolicy.STRICT)
+            .setPoolConcurrencyPolicy(PoolConcurrencyPolicy.LAX)
             .setConnPoolPolicy(PoolReusePolicy.LIFO)
             .setDefaultConnectionConfig(
                 ConnectionConfig.custom()
@@ -61,6 +61,8 @@ public class AHC5HttpClient extends HttpClient {
                 .setTimeToLive(TimeValue.ofMinutes(10))
                 .build()
             )
+			.setMaxConnPerRoute(100)
+			.setMaxConnTotal(100)
             .build();
 
 
