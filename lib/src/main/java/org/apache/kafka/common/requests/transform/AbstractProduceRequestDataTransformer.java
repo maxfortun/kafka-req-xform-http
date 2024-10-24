@@ -63,8 +63,8 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
     public AbstractProduceRequestDataTransformer(String transformerName) {
         this.transformerName = transformerName;
 
-        topicNamePattern = appConfig("topicNamePattern");
-        headerPrefix = appConfig("httpHeaderPrefix", transformerName+"-");
+        topicNamePattern = appConfig("topics.namePattern");
+        headerPrefix = appConfig("headers.prefix", transformerName+"-");
     }
 
     protected String appConfig(String key, String defaultValue) {

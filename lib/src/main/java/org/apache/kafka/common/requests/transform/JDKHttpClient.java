@@ -33,7 +33,7 @@ public class JDKHttpClient extends HttpClient {
     public JDKHttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
         super(httpProduceRequestDataTransformer);
 
-        String requestTimeoutString = httpProduceRequestDataTransformer.appConfig("requestTimeout");
+        String requestTimeoutString = httpProduceRequestDataTransformer.appConfig("httpClient.socketTimeout");
         if(null != requestTimeoutString) {
             requestTimeout = Duration.parse(requestTimeoutString);
         } else {

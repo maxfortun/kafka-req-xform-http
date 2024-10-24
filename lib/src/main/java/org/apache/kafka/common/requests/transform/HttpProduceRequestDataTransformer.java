@@ -47,18 +47,18 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
     private final HttpClient httpClient;
 
-    private final String headerPattern;
-
-    private final String envPattern;
+    private final String persistentHeadersPattern;
+    private final String transientHeadersPattern;
+    private final String envHeadersPattern;
 
     public HttpProduceRequestDataTransformer(String transformerName) throws Exception {
         super(transformerName);
 
         brokerHostname = System.getenv("HOSTNAME"); 
 
-        headerPattern = appConfig("headerPattern");
-
-        envPattern = appConfig("envPattern");
+        persistentHeadersPattern = appConfig("headers.persistentPattern");
+        transientHeadersPattern = appConfig("headers.transientPattern");
+        envHeadersPattern = appConfig("headers.envPattern");
 
 		httpClient = HttpClient.newHttpClient(this);
     }
@@ -102,27 +102,31 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
         AbstractHttpRequest httpRequest = httpClient.newHttpRequest(reqConfig(recordHeaders, "uri"));
 
+        Map<String, List<String>> resHeadersMap = new HashMap<>();
+
         for(Header header : record.headers()) {
             String key = header.key();
 
             if(key.matches("(?i)^"+headerPrefix)) {
-                log.debug("{}: req header {} skipped, because it starts with the http header prefix {}", transformerName, key, headerPrefix);
-                continue;
-            }
-
-            if(null != headerPattern && !key.matches(headerPattern)) {
-                log.debug("{}: req header {} skipped, because it does not match header pattern {}", transformerName, key, headerPattern);
+                log.debug("{}: request header {} skipped, because it starts with the http header prefix {}", transformerName, key, headerPrefix);
                 continue;
             }
 
             String value = Utils.utf8(header.value());
 
-            try {
-                httpRequest.header(key, value);
-                log.debug("{}: req header added {}={}", transformerName, key, value);
-            } catch(java.lang.IllegalArgumentException e) {
-                log.debug("{}: req header added {}={}", transformerName, key, value, e);
-            }
+            if(null == persistentHeadersPattern || key.matches(persistentHeadersPattern)) {
+            	try {
+                	httpRequest.header(key, value);
+               		log.debug("{}: persistent header added to request {}={}", transformerName, key, value);
+            	} catch(java.lang.IllegalArgumentException e) {
+                	log.debug("{}: persistent header not added to request {}={}", transformerName, key, value, e);
+				}
+			}
+
+            if(null != transientHeadersPattern && key.matches(transientHeadersPattern)) {
+            	resHeadersMap.put(key, Arrays.asList(value));
+               	log.debug("{}: transient header retained for response {}={}", transformerName, key, value);
+			}
         }
 
         httpRequest.header(headerPrefix+"broker-hostname", brokerHostname);
@@ -137,7 +141,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         Date reqDate = new Date();
         httpRequest.header(headerPrefix+"broker-req-time", ""+reqDate.getTime());
 
-        Map<String, List<String>> headersMap = new HashMap<>();
         byte[] body = new byte[0];
 
         if(configured(recordHeaders, "enable-send", "true")) {
@@ -154,7 +157,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                     throw new HttpResponseException(httpResponse);
                 }
             }
-            headersMap.putAll(httpResponse.headers());
+            resHeadersMap.putAll(httpResponse.headers());
             body = httpResponse.body();
         }
 
@@ -162,34 +165,34 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         long reqRunTime = resDate.getTime() - reqDate.getTime();
 
         // Broker headers should never be returned by the called service.
-        headersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(headerPrefix+"broker-"));
+        resHeadersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(headerPrefix+"broker-"));
 
         if(configured("in-headers", "hostname")) {
-            headersMap.put(headerPrefix+"broker-hostname", Arrays.asList(brokerHostname));
+            resHeadersMap.put(headerPrefix+"broker-hostname", Arrays.asList(brokerHostname));
         }
 
-        if(null != envPattern && configured(recordHeaders, "in-headers", "env")) {
+        if(null != envHeadersPattern && configured(recordHeaders, "in-headers", "env")) {
 			System.getenv().entrySet().stream()
-				.filter( entry -> entry.getKey().matches(envPattern) )
-            	.forEach( entry -> headersMap.put(headerPrefix+"broker-env-"+entry.getKey().replaceAll("_","-"), Arrays.asList(entry.getValue())) );
+				.filter( entry -> entry.getKey().matches(envHeadersPattern) )
+            	.forEach( entry -> resHeadersMap.put(headerPrefix+"broker-env-"+entry.getKey().replaceAll("_","-"), Arrays.asList(entry.getValue())) );
         }
 
         Date outDate = new Date();
         long runTime = outDate.getTime() - inDate.getTime();
 
         if(configured("in-headers", "time")) {
-            headersMap.put(headerPrefix+"broker-in-time", Arrays.asList(""+inDate.getTime()));
-            headersMap.put(headerPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
-            headersMap.put(headerPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
-            headersMap.put(headerPrefix+"broker-out-time", Arrays.asList(""+outDate.getTime()));
+            resHeadersMap.put(headerPrefix+"broker-in-time", Arrays.asList(""+inDate.getTime()));
+            resHeadersMap.put(headerPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
+            resHeadersMap.put(headerPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
+            resHeadersMap.put(headerPrefix+"broker-out-time", Arrays.asList(""+outDate.getTime()));
         }
 
         if(configured("in-headers", "timespan")) {
-            headersMap.put(headerPrefix+"broker-req-timespan", Arrays.asList(""+reqRunTime));
-            headersMap.put(headerPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
+            resHeadersMap.put(headerPrefix+"broker-req-timespan", Arrays.asList(""+reqRunTime));
+            resHeadersMap.put(headerPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
         }
 
-        Header[] headers = headers(headersMap);
+        Header[] headers = headers(resHeadersMap);
 
         log.trace("{}: res body {}", transformerName, body.length, body);
         log.trace("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
