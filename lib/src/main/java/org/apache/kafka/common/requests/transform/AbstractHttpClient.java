@@ -18,11 +18,11 @@ package org.apache.kafka.common.requests.transform;
 
 public abstract class AbstractHttpClient {
 
-	protected HttpProduceRequestDataTransformer httpProduceRequestDataTransformer;
+    protected HttpProduceRequestDataTransformer httpProduceRequestDataTransformer;
 
-	public AbstractHttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
+    public AbstractHttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
         this.httpProduceRequestDataTransformer = httpProduceRequestDataTransformer;
-	}
+    }
 
     public abstract AbstractHttpRequest newHttpRequest(String uri) throws Exception;
     public abstract HttpResponse send(AbstractHttpRequest httpRequest) throws Exception;

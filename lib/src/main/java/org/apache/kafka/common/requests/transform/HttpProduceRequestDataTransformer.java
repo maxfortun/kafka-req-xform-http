@@ -96,7 +96,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
         Date inDate = new Date();
 
-		AbstractHttpClient httpClient = HttpClients.getHttpClient(recordHeaders, this);
+        AbstractHttpClient httpClient = HttpClients.getHttpClient(recordHeaders, this);
         AbstractHttpRequest httpRequest = httpClient.newHttpRequest(reqConfig(recordHeaders, "uri"));
 
         Map<String, List<String>> resHeadersMap = new HashMap<>();
