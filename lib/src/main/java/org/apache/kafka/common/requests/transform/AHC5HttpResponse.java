@@ -32,7 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class AHC5HttpResponse implements HttpResponse {
-    public static final Logger log = LoggerFactory.getLogger(AHC5HttpResponse.class);
+    private static final Logger log = LoggerFactory.getLogger(AHC5HttpResponse.class);
 
     private final AHC5HttpRequest httpRequest;
     private final ClassicHttpResponse httpResponse;

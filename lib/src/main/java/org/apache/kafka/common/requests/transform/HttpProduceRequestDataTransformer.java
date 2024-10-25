@@ -41,11 +41,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDataTransformer {
-    public static final Logger log = LoggerFactory.getLogger(HttpProduceRequestDataTransformer.class);
+    private static final Logger log = LoggerFactory.getLogger(HttpProduceRequestDataTransformer.class);
 
     private final String brokerHostname;
-
-    private final HttpClient httpClient;
 
     private final String persistentHeadersPattern;
     private final String transientHeadersPattern;
@@ -59,8 +57,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         persistentHeadersPattern = appConfig("headers.persistentPattern");
         transientHeadersPattern = appConfig("headers.transientPattern");
         envHeadersPattern = appConfig("headers.envPattern");
-
-        httpClient = HttpClient.newHttpClient(this);
     }
 
     protected Record transform(
@@ -100,6 +96,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
         Date inDate = new Date();
 
+		AbstractHttpClient httpClient = HttpClients.getHttpClient(recordHeaders, this);
         AbstractHttpRequest httpRequest = httpClient.newHttpRequest(reqConfig(recordHeaders, "uri"));
 
         Map<String, List<String>> resHeadersMap = new HashMap<>();

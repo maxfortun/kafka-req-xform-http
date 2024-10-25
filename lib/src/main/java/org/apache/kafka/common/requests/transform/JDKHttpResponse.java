@@ -28,7 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class JDKHttpResponse implements HttpResponse {
-    public static final Logger log = LoggerFactory.getLogger(JDKHttpResponse.class);
+    private static final Logger log = LoggerFactory.getLogger(JDKHttpResponse.class);
 
     private JDKHttpRequest httpRequest;
     private java.net.http.HttpResponse<byte[]> httpResponse;

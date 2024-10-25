@@ -38,8 +38,8 @@ import org.apache.hc.core5.util.TimeValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class AHC5HttpClient extends HttpClient {
-    public static final Logger log = LoggerFactory.getLogger(AHC5HttpClient.class);
+public class AHC5HttpClient extends AbstractHttpClient {
+    private static final Logger log = LoggerFactory.getLogger(AHC5HttpClient.class);
 
     private final CloseableHttpClient httpClient;
 

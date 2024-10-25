@@ -16,17 +16,14 @@
  */
 package org.apache.kafka.common.requests.transform;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+public abstract class AbstractHttpClient {
 
-public class HttpResponseException extends Exception {
-    private static final Logger log = LoggerFactory.getLogger(HttpResponseException.class);
+	protected HttpProduceRequestDataTransformer httpProduceRequestDataTransformer;
 
-    private HttpResponse httpResponse;
+	public AbstractHttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
+        this.httpProduceRequestDataTransformer = httpProduceRequestDataTransformer;
+	}
 
-    public HttpResponseException(HttpResponse httpResponse) {
-        super(httpResponse.request().uri()+" returned "+httpResponse.statusCode()+"\n"+new String(httpResponse.body()));
-        this.httpResponse = httpResponse;
-    }
+    public abstract AbstractHttpRequest newHttpRequest(String uri) throws Exception;
+    public abstract HttpResponse send(AbstractHttpRequest httpRequest) throws Exception;
 }
-

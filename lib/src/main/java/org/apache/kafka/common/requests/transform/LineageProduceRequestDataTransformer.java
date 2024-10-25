@@ -29,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class LineageProduceRequestDataTransformer extends AbstractProduceRequestDataTransformer {
-    public static final Logger log = LoggerFactory.getLogger(LineageProduceRequestDataTransformer.class);
+    private static final Logger log = LoggerFactory.getLogger(LineageProduceRequestDataTransformer.class);
 
     private String lineagePrefix;
 

@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Utils {
-    public static final Logger log = LoggerFactory.getLogger(Utils.class);
+    private static final Logger log = LoggerFactory.getLogger(Utils.class);
 
     public static String utf8(byte[] bytes) {
         if(null == bytes) {

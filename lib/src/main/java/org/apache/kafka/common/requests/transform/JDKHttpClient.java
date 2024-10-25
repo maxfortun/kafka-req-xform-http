@@ -23,8 +23,8 @@ import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JDKHttpClient extends HttpClient {
-    public static final Logger log = LoggerFactory.getLogger(JDKHttpClient.class);
+public class JDKHttpClient extends AbstractHttpClient {
+    private static final Logger log = LoggerFactory.getLogger(JDKHttpClient.class);
 
     private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
 		.version(java.net.http.HttpClient.Version.HTTP_2)

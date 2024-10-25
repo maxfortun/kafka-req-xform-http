@@ -51,7 +51,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class AbstractProduceRequestDataTransformer implements ProduceRequestDataTransformer {
-    public static final Logger log = LoggerFactory.getLogger(AbstractProduceRequestDataTransformer.class);
+    private static final Logger log = LoggerFactory.getLogger(AbstractProduceRequestDataTransformer.class);
 
     protected String transformerName;
 

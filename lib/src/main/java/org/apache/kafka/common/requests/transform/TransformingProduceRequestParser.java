@@ -35,7 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class TransformingProduceRequestParser implements ProduceRequestParser {
-    public static final Logger log = LoggerFactory.getLogger(TransformingProduceRequestParser.class);
+    private static final Logger log = LoggerFactory.getLogger(TransformingProduceRequestParser.class);
 
     private static Class[] transformerConstructorParameterTypes = new Class[] {String.class};
 

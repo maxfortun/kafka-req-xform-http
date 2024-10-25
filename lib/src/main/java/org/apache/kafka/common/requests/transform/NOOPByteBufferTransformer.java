@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class NOOPByteBufferTransformer implements ByteBufferTransformer {
-    public static final Logger log = LoggerFactory.getLogger(NOOPByteBufferTransformer.class);
+    private static final Logger log = LoggerFactory.getLogger(NOOPByteBufferTransformer.class);
 
     private String transformerName;
 

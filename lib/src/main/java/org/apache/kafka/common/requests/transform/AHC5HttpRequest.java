@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class AHC5HttpRequest extends AbstractHttpRequest {
-    public static final Logger log = LoggerFactory.getLogger(AHC5HttpRequest.class);
+    private static final Logger log = LoggerFactory.getLogger(AHC5HttpRequest.class);
 
     private AHC5HttpClient httpClient;
     private String headerPrefix;
