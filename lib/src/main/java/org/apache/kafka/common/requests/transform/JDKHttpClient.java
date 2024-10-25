@@ -26,7 +26,9 @@ import org.slf4j.LoggerFactory;
 public class JDKHttpClient extends HttpClient {
     public static final Logger log = LoggerFactory.getLogger(JDKHttpClient.class);
 
-    private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newHttpClient();
+    private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+		.version(java.net.http.HttpClient.Version.HTTP_2)
+		.build();
 
     private final Duration requestTimeout;
 
