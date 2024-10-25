@@ -146,7 +146,7 @@ public abstract class AbstractProduceRequestDataTransformer implements ProduceRe
             return appConfig(key);
         }
 
-        String fullKey = headerPrefix+"broker-"+key;
+        String fullKey = headerPrefix+"broker-"+key.replaceAll("[^a-zA-Z0-9-]","-");
         Header header = recordHeaders.lastHeader(fullKey);
         if(null == header) {
             log.trace("{}: No header {}", transformerName, fullKey);
