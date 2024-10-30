@@ -49,6 +49,7 @@ public class AHC5HttpClient extends AbstractHttpClient {
         PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
             .setDefaultSocketConfig(
                 SocketConfig.custom()
+                .setTcpNoDelay(true)
                 .setSoKeepAlive(true)
                 .setSoTimeout(appTimeout("soTimeout"))
                 .build()
