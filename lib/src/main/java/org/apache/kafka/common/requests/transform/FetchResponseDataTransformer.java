@@ -19,5 +19,5 @@ package org.apache.kafka.common.requests.transform;
 import org.apache.kafka.common.message.FetchResponseData;
 
 public interface FetchResponseDataTransformer {
-    public FetchResponseData transform(FetchResponseData produceRequestData, short version);
+    public FetchResponseData transform(FetchResponseData fetchResponseData, short version);
 }
