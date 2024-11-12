@@ -100,6 +100,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         AbstractHttpRequest httpRequest = httpClient.newHttpRequest(reqConfig(recordHeaders, "uri"));
 
         Map<String, List<String>> resHeadersMap = new HashMap<>();
+        Map<String, List<String>> origHeadersMap = new HashMap<>();
 
         for(Header header : record.headers()) {
             String key = header.key();
@@ -113,6 +114,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
             if(null == persistentHeadersPattern || key.matches(persistentHeadersPattern)) {
                 try {
+                    origHeadersMap.put(key, Arrays.asList(value));
                     httpRequest.header(key, value);
                     log.debug("{}: persistent header added to request {}={}", transformerName, key, value);
                 } catch(java.lang.IllegalArgumentException e) {
@@ -132,6 +134,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         String recordKey = null;
         if(null != record.key()) {
             recordKey = Utils.utf8(record.key());
+            httpRequest.header("kafka.KEY", recordKey);
         }
         httpRequest.body(recordKey, record.value());
 
@@ -154,9 +157,17 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                     throw new HttpResponseException(httpResponse);
                 }
             }
+
             resHeadersMap.putAll(httpResponse.headers());
             body = httpResponse.body();
         }
+
+/*
+        if(configured(recordHeaders, "response-mode", "original")) {
+            resHeadersMap.putAll(origHeadersMap);
+            // body = record.value().toArray();
+        }
+*/
 
         Date resDate = new Date();
         long reqRunTime = resDate.getTime() - reqDate.getTime();
