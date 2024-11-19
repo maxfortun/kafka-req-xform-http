@@ -45,7 +45,7 @@ public class JDKHttpRequest extends AbstractHttpRequest {
 
     public AbstractHttpRequest body(String key, ByteBuffer byteBuffer) {
         if(!org.apache.kafka.common.utils.Utils.isBlank(key)) {
-            header(headerPrefix+"broker-message-key", key);
+            header(headerPrefix+"message-key", key);
         }
 
         int position = byteBuffer.position();

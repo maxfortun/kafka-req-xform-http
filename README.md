@@ -4,6 +4,10 @@
 ### Build
 Must set `KAFKA_VERSION` for build to work.
 ```
+KAFKA_VERSION=3.7.2-SNAPSHOT ./gradlew jar
+```
+or
+```
 KAFKA_VERSION=4.0.0-SNAPSHOT ./gradlew jar
 ```
 

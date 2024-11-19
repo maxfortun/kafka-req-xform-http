@@ -47,7 +47,7 @@ public class AHC5HttpRequest extends AbstractHttpRequest {
 
     public AbstractHttpRequest body(String key, ByteBuffer byteBuffer) {
         if(!org.apache.kafka.common.utils.Utils.isBlank(key)) {
-            header(headerPrefix+"broker-message-key", key);
+            header(headerPrefix+"message-key", key);
         }
 
         httpRequest.setEntity(new ByteBufferEntity(byteBuffer, ContentType.DEFAULT_BINARY));

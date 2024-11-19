@@ -128,8 +128,8 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             }
         }
 
-        httpRequest.header(headerPrefix+"broker-hostname", brokerHostname);
-        httpRequest.header(headerPrefix+"broker-topic-name", topicProduceData.name());
+        httpRequest.header(headerPrefix+"hostname", brokerHostname);
+        httpRequest.header(headerPrefix+"topic-name", topicProduceData.name());
 
         String recordKey = null;
         if(null != record.key()) {
@@ -139,7 +139,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         httpRequest.body(recordKey, record.value());
 
         Date reqDate = new Date();
-        httpRequest.header(headerPrefix+"broker-req-time", ""+reqDate.getTime());
+        httpRequest.header(headerPrefix+"req-time", ""+reqDate.getTime());
 
         byte[] body = new byte[0];
 
@@ -173,31 +173,31 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         long reqRunTime = resDate.getTime() - reqDate.getTime();
 
         // Broker headers should never be returned by the called service.
-        resHeadersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(headerPrefix+"broker-"));
+        resHeadersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(headerPrefix+""));
 
         if(configured("in-headers", "hostname")) {
-            resHeadersMap.put(headerPrefix+"broker-hostname", Arrays.asList(brokerHostname));
+            resHeadersMap.put(headerPrefix+"hostname", Arrays.asList(brokerHostname));
         }
 
         if(null != envHeadersPattern && configured(recordHeaders, "in-headers", "env")) {
             System.getenv().entrySet().stream()
                 .filter( entry -> entry.getKey().matches(envHeadersPattern) )
-                .forEach( entry -> resHeadersMap.put(headerPrefix+"broker-env-"+entry.getKey().replaceAll("_","-"), Arrays.asList(entry.getValue())) );
+                .forEach( entry -> resHeadersMap.put(headerPrefix+"env-"+entry.getKey().replaceAll("_","-"), Arrays.asList(entry.getValue())) );
         }
 
         Date outDate = new Date();
         long runTime = outDate.getTime() - inDate.getTime();
 
         if(configured("in-headers", "time")) {
-            resHeadersMap.put(headerPrefix+"broker-in-time", Arrays.asList(""+inDate.getTime()));
-            resHeadersMap.put(headerPrefix+"broker-req-time", Arrays.asList(""+reqDate.getTime()));
-            resHeadersMap.put(headerPrefix+"broker-res-time", Arrays.asList(""+resDate.getTime()));
-            resHeadersMap.put(headerPrefix+"broker-out-time", Arrays.asList(""+outDate.getTime()));
+            resHeadersMap.put(headerPrefix+"in-time", Arrays.asList(""+inDate.getTime()));
+            resHeadersMap.put(headerPrefix+"req-time", Arrays.asList(""+reqDate.getTime()));
+            resHeadersMap.put(headerPrefix+"res-time", Arrays.asList(""+resDate.getTime()));
+            resHeadersMap.put(headerPrefix+"out-time", Arrays.asList(""+outDate.getTime()));
         }
 
         if(configured("in-headers", "timespan")) {
-            resHeadersMap.put(headerPrefix+"broker-req-timespan", Arrays.asList(""+reqRunTime));
-            resHeadersMap.put(headerPrefix+"broker-run-timespan", Arrays.asList(""+runTime));
+            resHeadersMap.put(headerPrefix+"req-timespan", Arrays.asList(""+reqRunTime));
+            resHeadersMap.put(headerPrefix+"run-timespan", Arrays.asList(""+runTime));
         }
 
         Header[] headers = headers(resHeadersMap);
