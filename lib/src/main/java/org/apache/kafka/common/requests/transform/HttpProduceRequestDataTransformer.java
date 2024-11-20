@@ -173,7 +173,13 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         long reqRunTime = resDate.getTime() - reqDate.getTime();
 
         // Broker headers should never be returned by the called service.
-        resHeadersMap.entrySet().removeIf(entry -> entry.getKey().startsWith(headerPrefix+""));
+        resHeadersMap.entrySet().removeIf(entry -> {
+            boolean shouldRemove = entry.getKey().startsWith(headerPrefix);
+            if(shouldRemove) {
+                log.debug("{}: response header {} skipped, because it starts with the http header prefix {}", transformerName, entry.getKey(), headerPrefix);
+            }
+            return shouldRemove;
+        });
 
         if(configured("in-headers", "hostname")) {
             resHeadersMap.put(headerPrefix+"hostname", Arrays.asList(brokerHostname));
