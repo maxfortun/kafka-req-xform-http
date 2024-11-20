@@ -64,7 +64,7 @@ public abstract class AbstractFetchResponseDataTransformer implements FetchRespo
         this.transformerName = transformerName;
 
         topicNamePattern = appConfig("topics.namePattern");
-        headerPrefix = appConfig("headers.prefix", transformerName+"-");
+        headerPrefix = appConfig("headers.prefix", transformerName+"-broker-");
     }
 
     protected String appConfig(String key, String defaultValue) {
