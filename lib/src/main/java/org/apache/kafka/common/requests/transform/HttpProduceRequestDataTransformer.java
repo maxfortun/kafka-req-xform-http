@@ -104,27 +104,30 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
         for(Header header : record.headers()) {
             String key = header.key();
+            String value = Utils.utf8(header.value());
 
             if(key.matches("(?i)^"+headerPrefix)) {
-                log.debug("{}: request header {} skipped, because it starts with the http header prefix {}", transformerName, key, headerPrefix);
+                log.debug("{}: request header {}={} not added to request, starts with the http header prefix {}", transformerName, key, value, headerPrefix);
                 continue;
             }
-
-            String value = Utils.utf8(header.value());
 
             if(null == persistentHeadersPattern || key.matches(persistentHeadersPattern)) {
                 try {
                     origHeadersMap.put(key, Arrays.asList(value));
                     httpRequest.header(key, value);
-                    log.debug("{}: persistent header added to request {}={}", transformerName, key, value);
+                    log.debug("{}: persistent header {}={} added to request", transformerName, key, value);
                 } catch(java.lang.IllegalArgumentException e) {
-                    log.debug("{}: persistent header not added to request {}={}", transformerName, key, value, e);
+                    log.debug("{}: persistent header {}={} not added to request", transformerName, key, value, e);
                 }
+            } else {
+                log.debug("{}: persistent header {}={} not added to request, doesn't match persistent headers pattern {}", transformerName, key, value, persistentHeadersPattern);
             }
 
             if(null != transientHeadersPattern && key.matches(transientHeadersPattern)) {
                 resHeadersMap.put(key, Arrays.asList(value));
-                log.debug("{}: transient header retained for response {}={}", transformerName, key, value);
+                log.debug("{}: transient header {}={} retained for response", transformerName, key, value);
+            } else {
+                log.debug("{}: transient header {}={} not retained for response, doesn't match transient headers pattern {}", transformerName, key, value, transientHeadersPattern);
             }
         }
 
