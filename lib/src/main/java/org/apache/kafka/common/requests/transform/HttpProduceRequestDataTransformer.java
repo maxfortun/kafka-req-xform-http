@@ -90,8 +90,23 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
     ) throws Exception {
 
         if(!configured(recordHeaders, "enable", "true")) {
-            return record;
+            Header[] headers = Arrays.stream(recordHeaders.toArray())
+                .filter( header -> {
+                    String key = header.key();
+
+                    if(key.matches("(?i)^"+headerPrefix)) {
+                        if(log.isDebugEnabled()) {
+                            String value = Utils.utf8(header.value());
+                            log.debug("{}: request header {}={} not added to request, matches headers.prefix {}", transformerName, key, value, headerPrefix);
+                        }
+                        return false;
+                    }
+                    return true;
+                } )
+                .toArray(Header[]::new);
+            return newRecord(recordBatch, record, headers, record.value());
         }
+
         Date inDate = new Date();
 
         AbstractHttpClient httpClient = HttpClients.getHttpClient(recordHeaders, this);
@@ -105,7 +120,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             String value = Utils.utf8(header.value());
 
             if(key.matches("(?i)^"+headerPrefix)) {
-                log.debug("{}: request header {}={} not added to request, starts with the http header prefix {}", transformerName, key, value, headerPrefix);
+                log.debug("{}: request header {}={} not added to request, matches headers.prefix {}", transformerName, key, value, headerPrefix);
                 continue;
             }
 
@@ -113,20 +128,20 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 try {
                     origHeadersMap.put(key, Arrays.asList(value));
                     httpRequest.header(key, value);
-                    log.debug("{}: persistent header {}={} added to request", transformerName, key, value);
+                    log.debug("{}: persistent header {}={} added to request, matches headers.persistentPattern {}", transformerName, key, value, persistentHeadersPattern);
                 } catch(java.lang.IllegalArgumentException e) {
                     log.debug("{}: persistent header {}={} not added to request", transformerName, key, value, e);
                 }
             } else {
-                log.debug("{}: persistent header {}={} not added to request, doesn't match persistent headers pattern {}", transformerName, key, value, persistentHeadersPattern);
+                log.debug("{}: persistent header {}={} not added to request, doesn't match pattern headers.persistentPattern {}", transformerName, key, value, persistentHeadersPattern);
             }
 
             String transientHeadersPattern = reqConfig(recordHeaders, "headers.transientPattern");
             if(null != transientHeadersPattern && key.matches(transientHeadersPattern)) {
                 resHeadersMap.put(key, Arrays.asList(value));
-                log.debug("{}: transient header {}={} retained for response", transformerName, key, value);
+                log.debug("{}: transient header {}={} added to response, matches headers.transientPattern {}", transformerName, key, value, transientHeadersPattern);
             } else {
-                log.debug("{}: transient header {}={} not retained for response, doesn't match transient headers pattern {}", transformerName, key, value, transientHeadersPattern);
+                log.debug("{}: transient header {}={} not added to response, doesn't match headers.transientPattern {}", transformerName, key, value, transientHeadersPattern);
             }
         }
 
@@ -178,7 +193,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         resHeadersMap.entrySet().removeIf(entry -> {
             boolean shouldRemove = entry.getKey().startsWith(headerPrefix);
             if(shouldRemove) {
-                log.debug("{}: response header {} skipped, because it starts with the http header prefix {}", transformerName, entry.getKey(), headerPrefix);
+                log.debug("{}: response header {} not added, matches headers.prefix {}", transformerName, entry.getKey(), headerPrefix);
             }
             return shouldRemove;
         });
@@ -189,7 +204,13 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
         if(null != envHeadersPattern && configured(recordHeaders, "in-headers", "env")) {
             System.getenv().entrySet().stream()
-                .filter( entry -> entry.getKey().matches(envHeadersPattern) )
+                .filter( entry -> {
+                    if(entry.getKey().matches(envHeadersPattern)) {
+                        log.debug("{}: env header {} added, matches headers.envPattern {}", transformerName, entry.getKey(), envHeadersPattern);
+                        return true;
+                    }
+                    return false;
+                } )
                 .forEach( entry -> resHeadersMap.put(headerPrefix+"env-"+entry.getKey().replaceAll("_","-"), Arrays.asList(entry.getValue())) );
         }
 
