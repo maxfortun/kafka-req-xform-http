@@ -46,7 +46,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
     private final String brokerHostname;
 
     private final String persistentHeadersPattern;
-    private final String transientHeadersPattern;
     private final String envHeadersPattern;
 
     public HttpProduceRequestDataTransformer(String transformerName) throws Exception {
@@ -55,7 +54,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         brokerHostname = System.getenv("HOSTNAME"); 
 
         persistentHeadersPattern = appConfig("headers.persistentPattern");
-        transientHeadersPattern = appConfig("headers.transientPattern");
         envHeadersPattern = appConfig("headers.envPattern");
     }
 
@@ -123,6 +121,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 log.debug("{}: persistent header {}={} not added to request, doesn't match persistent headers pattern {}", transformerName, key, value, persistentHeadersPattern);
             }
 
+            String transientHeadersPattern = reqConfig(recordHeaders, "headers.transientPattern");
             if(null != transientHeadersPattern && key.matches(transientHeadersPattern)) {
                 resHeadersMap.put(key, Arrays.asList(value));
                 log.debug("{}: transient header {}={} retained for response", transformerName, key, value);
