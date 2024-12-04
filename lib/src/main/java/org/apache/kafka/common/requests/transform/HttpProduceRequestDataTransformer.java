@@ -53,7 +53,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         super(transformerName);
 
         brokerHostname = System.getenv("HOSTNAME"); 
-        headerPrefixPattern = "(?i)^"+headerPrefix;
+        headerPrefixPattern = "(?i)^"+headerPrefix+".*$";
         persistentHeadersPattern = appConfig("headers.persistentPattern");
         envHeadersPattern = appConfig("headers.envPattern");
     }
