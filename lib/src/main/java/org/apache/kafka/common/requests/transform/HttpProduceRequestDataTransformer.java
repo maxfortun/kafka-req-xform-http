@@ -93,14 +93,14 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             Header[] headers = Arrays.stream(recordHeaders.toArray())
                 .filter( header -> {
                     String key = header.key();
+                    String value = Utils.utf8(header.value());
 
                     if(key.matches("(?i)^"+headerPrefix)) {
-                        if(log.isDebugEnabled()) {
-                            String value = Utils.utf8(header.value());
-                            log.debug("{}: request header {}={} not added to request, matches headers.prefix {}", transformerName, key, value, headerPrefix);
-                        }
+                        log.debug("{}: request header {}={} not added to request, matches headers.prefix {}", transformerName, key, value, headerPrefix);
                         return false;
                     }
+
+                    log.debug("{}: request header {}={} added to request, matches headers.prefix {}", transformerName, key, value, headerPrefix);
                     return true;
                 } )
                 .toArray(Header[]::new);
