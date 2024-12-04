@@ -45,6 +45,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
     private final String brokerHostname;
 
+    private final String headerPrefixPattern;
     private final String persistentHeadersPattern;
     private final String envHeadersPattern;
 
@@ -52,7 +53,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         super(transformerName);
 
         brokerHostname = System.getenv("HOSTNAME"); 
-
+        headerPrefixPattern = "(?i)^"+headerPrefix;
         persistentHeadersPattern = appConfig("headers.persistentPattern");
         envHeadersPattern = appConfig("headers.envPattern");
     }
@@ -95,12 +96,12 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                     String key = header.key();
                     String value = Utils.utf8(header.value());
 
-                    if(key.matches("(?i)^"+headerPrefix)) {
-                        log.debug("{}: request header {}={} not added to request, matches headers.prefix {}", transformerName, key, value, headerPrefix);
+                    if(key.matches(headerPrefixPattern)) {
+                        log.debug("{}: request header {}={} not added to request, matches headerPrefixPattern {}", transformerName, key, value, headerPrefixPattern);
                         return false;
                     }
 
-                    log.debug("{}: request header {}={} added to request, matches headers.prefix {}", transformerName, key, value, headerPrefix);
+                    log.debug("{}: request header {}={} added to request, doesn't match headerPrefixPattern {}", transformerName, key, value, headerPrefixPattern);
                     return true;
                 } )
                 .toArray(Header[]::new);
@@ -119,8 +120,8 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             String key = header.key();
             String value = Utils.utf8(header.value());
 
-            if(key.matches("(?i)^"+headerPrefix)) {
-                log.debug("{}: request header {}={} not added to request, matches headers.prefix {}", transformerName, key, value, headerPrefix);
+            if(key.matches(headerPrefixPattern)) {
+                log.debug("{}: request header {}={} not added to request, matches headerPrefixPattern {}", transformerName, key, value, headerPrefixPattern);
                 continue;
             }
 
@@ -191,9 +192,9 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
         // Broker headers should never be returned by the called service.
         resHeadersMap.entrySet().removeIf(entry -> {
-            boolean shouldRemove = entry.getKey().startsWith(headerPrefix);
+            boolean shouldRemove = entry.getKey().matches(headerPrefixPattern);
             if(shouldRemove) {
-                log.debug("{}: response header {} not added, matches headers.prefix {}", transformerName, entry.getKey(), headerPrefix);
+                log.debug("{}: response header {} not added, matches headerPrefixPattern {}", transformerName, entry.getKey(), headerPrefixPattern);
             }
             return shouldRemove;
         });
