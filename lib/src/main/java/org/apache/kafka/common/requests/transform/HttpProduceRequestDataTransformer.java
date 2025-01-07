@@ -90,7 +90,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         short version
     ) throws Exception {
 
-        if(!configured(recordHeaders, "enable", "true")) {
+        if(configured(recordHeaders, "enable", "false")) {
             Header[] headers = Arrays.stream(recordHeaders.toArray())
                 .filter( header -> {
                     String key = header.key();
@@ -106,6 +106,10 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 } )
                 .toArray(Header[]::new);
             return newRecord(recordBatch, record, headers, record.value());
+        }
+
+        if(!configured(recordHeaders, "enable", "true")) {
+            throw new IllegalArgumentException("");
         }
 
         Date inDate = new Date();
