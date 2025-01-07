@@ -107,7 +107,7 @@ public abstract class AbstractTransformer {
         String pattern = appConfig(key);
         if(null == pattern) {
             if(null == defaultValue) {
-                String message = key+" is not configured and has no default value.";
+                String message = key + " is not specified in " + transformerName + ".properties and has no default value.";
                 log.trace(message);
                 throw new IllegalArgumentException(message);
             }
@@ -132,7 +132,7 @@ public abstract class AbstractTransformer {
         String pattern = reqConfig(recordHeaders, key);
         if(null == pattern) {
             if(null == defaultValue) {
-                String message = key+" is not configured and has no default value.";
+                String message = headerPrefix + key + " is not specified in request and has no default value.";
                 log.trace(message);
                 throw new IllegalArgumentException(message);
             }
