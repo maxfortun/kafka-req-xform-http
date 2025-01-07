@@ -70,7 +70,7 @@ public class LineageFetchResponseDataTransformer extends AbstractFetchResponseDa
         short version
     ) throws Exception {
 
-        if(!configured(recordHeaders, "enable", "true")) {
+        if(!configured(recordHeaders, "enable", "true", true)) {
             return record;
         }
 
@@ -87,12 +87,12 @@ public class LineageFetchResponseDataTransformer extends AbstractFetchResponseDa
         Date outDate = new Date();
         long runTime = outDate.getTime() - inDate.getTime();
 
-        if(configured("in-headers", "time")) {
+        if(configured("in-headers", "time", false)) {
             setHeader(recordHeaders, headerPrefix+"in-time", ""+inDate.getTime());
             setHeader(recordHeaders, headerPrefix+"out-time", ""+outDate.getTime());
         }
 
-        if(configured("in-headers", "timespan")) {
+        if(configured("in-headers", "timespan", false)) {
             setHeader(recordHeaders, headerPrefix+"run-timespan", ""+runTime);
         }
 
@@ -102,7 +102,7 @@ public class LineageFetchResponseDataTransformer extends AbstractFetchResponseDa
 
     private String getLineage(FetchResponseData.FetchableTopicResponse fetchableTopicResponse, RecordHeaders recordHeaders, String key, Date inDate) {
         String lineage = getCurrentLineage(recordHeaders, key)+lineagePrefix+fetchableTopicResponse.topic();
-        if(configured(recordHeaders, "in-time", "true")) {
+        if(configured(recordHeaders, "in-time", "true", false)) {
             lineage += ":"+inDate.getTime();
         }
         return lineage;

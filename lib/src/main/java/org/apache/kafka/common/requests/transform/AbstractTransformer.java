@@ -99,15 +99,20 @@ public abstract class AbstractTransformer {
         return null;
     }
 
-    protected boolean configured(String key, String type, String value) {
-        return configured(key+"."+type, value);
+    protected boolean configured(String key, String type, String value, Boolean defaultValue) {
+        return configured(key+"."+type, value, defaultValue);
     }
 
-    protected boolean configured(String key, String value) {
+    protected boolean configured(String key, String value, Boolean defaultValue) {
         String pattern = appConfig(key);
         if(null == pattern) {
-            log.trace("{}: No pattern configured for {} = {}. Defaulting to true.", transformerName, key, value);
-            return true;
+            if(null == defaultValue) {
+                String message = key+" is not configured and has no default value.";
+                log.trace(message);
+                throw new IllegalArgumentException(message);
+            }
+            log.trace("{}: No pattern configured for {} = {}. Defaulting to {}.", transformerName, key, value, defaultValue);
+            return defaultValue;
         }
         
         boolean result = value.matches(pattern);
@@ -115,15 +120,24 @@ public abstract class AbstractTransformer {
         return result;
     }
 
-    protected boolean configured(RecordHeaders recordHeaders, String key, String type, String value) {
-        return configured(recordHeaders, key+"."+type, value);
+    protected boolean configured(RecordHeaders recordHeaders, String key, String type, String value, Boolean defaultValue) {
+        return configured(recordHeaders, key+"."+type, value, defaultValue);
     }
 
     protected boolean configured(RecordHeaders recordHeaders, String key, String value) {
+        return configured(recordHeaders, key, value, null);
+    }
+
+    protected boolean configured(RecordHeaders recordHeaders, String key, String value, Boolean defaultValue) {
         String pattern = reqConfig(recordHeaders, key);
         if(null == pattern) {
-            log.trace("{}: No pattern configured for {} = {}. Defaulting to true.", transformerName, key, value);
-            return true;
+            if(null == defaultValue) {
+                String message = key+" is not configured and has no default value.";
+                log.trace(message);
+                throw new IllegalArgumentException(message);
+            }
+            log.trace("{}: No pattern configured for {} = {}. Defaulting to {}.", transformerName, key, value, defaultValue);
+            return defaultValue;
         }
         
         boolean result = value.matches(pattern);
@@ -132,7 +146,7 @@ public abstract class AbstractTransformer {
     }
 
     protected String reqConfig(RecordHeaders recordHeaders, String key) {
-        if(!configured(key, "scopes", "request")) {
+        if(!configured(key, "scopes", "request", false)) {
             return appConfig(key);
         }
 

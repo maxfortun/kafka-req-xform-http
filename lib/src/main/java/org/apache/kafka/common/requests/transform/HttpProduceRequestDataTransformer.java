@@ -108,10 +108,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             return newRecord(recordBatch, record, headers, record.value());
         }
 
-        if(!configured(recordHeaders, "enable", "true")) {
-            throw new IllegalArgumentException("");
-        }
-
         Date inDate = new Date();
 
         AbstractHttpClient httpClient = HttpClients.getHttpClient(recordHeaders, this);
@@ -165,7 +161,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
         byte[] body = new byte[0];
 
-        if(configured(recordHeaders, "enable-send", "true")) {
+        if(configured(recordHeaders, "enable-send", "true", true)) {
             HttpResponse httpResponse = httpClient.send(httpRequest);
             log.debug("{}: httpResponse {}", transformerName, httpResponse);
             if(httpResponse.statusCode() != 200) {
@@ -185,7 +181,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         }
 
 /*
-        if(configured(recordHeaders, "response-mode", "original")) {
+        if(configured(recordHeaders, "response-mode", "original", false)) {
             resHeadersMap.putAll(origHeadersMap);
             // body = record.value().toArray();
         }
@@ -203,11 +199,11 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             return shouldRemove;
         });
 
-        if(configured("in-headers", "hostname")) {
+        if(configured("in-headers", "hostname", false)) {
             resHeadersMap.put(headerPrefix+"hostname", Arrays.asList(brokerHostname));
         }
 
-        if(null != envHeadersPattern && configured(recordHeaders, "in-headers", "env")) {
+        if(null != envHeadersPattern && configured(recordHeaders, "in-headers", "env", false)) {
             System.getenv().entrySet().stream()
                 .filter( entry -> {
                     if(entry.getKey().matches(envHeadersPattern)) {
@@ -222,14 +218,14 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         Date outDate = new Date();
         long runTime = outDate.getTime() - inDate.getTime();
 
-        if(configured("in-headers", "time")) {
+        if(configured("in-headers", "time", false)) {
             resHeadersMap.put(headerPrefix+"in-time", Arrays.asList(""+inDate.getTime()));
             resHeadersMap.put(headerPrefix+"req-time", Arrays.asList(""+reqDate.getTime()));
             resHeadersMap.put(headerPrefix+"res-time", Arrays.asList(""+resDate.getTime()));
             resHeadersMap.put(headerPrefix+"out-time", Arrays.asList(""+outDate.getTime()));
         }
 
-        if(configured("in-headers", "timespan")) {
+        if(configured("in-headers", "timespan", false)) {
             resHeadersMap.put(headerPrefix+"req-timespan", Arrays.asList(""+reqRunTime));
             resHeadersMap.put(headerPrefix+"run-timespan", Arrays.asList(""+runTime));
         }
