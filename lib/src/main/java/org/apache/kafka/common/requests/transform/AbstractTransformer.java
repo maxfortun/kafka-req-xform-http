@@ -105,9 +105,9 @@ public abstract class AbstractTransformer {
 
     protected boolean configured(String key, String value, Boolean defaultValue) {
         String pattern = appConfig(key);
-        if(null == pattern) {
+        if(null == pattern || pattern.isEmpty()) {
             if(null == defaultValue) {
-                String message = key + " is not specified in " + transformerName + ".properties and has no default value.";
+                String message = "Required property " + key + " is not specified in " + transformerName + ".properties and has no default value.";
                 log.trace(message);
                 throw new IllegalArgumentException(message);
             }
@@ -130,9 +130,9 @@ public abstract class AbstractTransformer {
 
     protected boolean configured(RecordHeaders recordHeaders, String key, String value, Boolean defaultValue) {
         String pattern = reqConfig(recordHeaders, key);
-        if(null == pattern) {
+        if(null == pattern || pattern.isEmpty()) {
             if(null == defaultValue) {
-                String message = headerPrefix + key + " is not specified in request and has no default value.";
+                String message = "Required header " + headerPrefix + key + " is not specified in request and has no default value.";
                 log.trace(message);
                 throw new IllegalArgumentException(message);
             }

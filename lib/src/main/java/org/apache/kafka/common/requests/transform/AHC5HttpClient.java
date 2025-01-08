@@ -75,7 +75,7 @@ public class AHC5HttpClient extends AbstractHttpClient {
 
     private Timeout appTimeout(String key) {
         String string = httpProduceRequestDataTransformer.appConfig("httpClient."+key);
-        if(null == string) {
+        if(null == string || string.isEmpty()) {
             return Timeout.INFINITE;
         }
         Timeout timeout = Timeout.ofSeconds(Long.parseLong(string));

@@ -77,7 +77,7 @@ public class LineageFetchResponseDataTransformer extends AbstractFetchResponseDa
         Date inDate = new Date();
 
         String key = reqConfig(recordHeaders, "key");
-        if(null == key) {
+        if(null == key || key.isBlank()) {
             key = transformerName;
         }
 
@@ -112,7 +112,7 @@ public class LineageFetchResponseDataTransformer extends AbstractFetchResponseDa
         Header header = null;
 
         String fromKeys = reqConfig(recordHeaders, "from-keys");
-        if(null != fromKeys) {
+        if(null != fromKeys && !fromKeys.isEmpty()) {
             for(String fromKey : fromKeys.split("[\\s,]+")) {
                 header = recordHeaders.lastHeader(fromKey);
                 if(null != header) {
