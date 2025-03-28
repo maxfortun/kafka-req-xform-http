@@ -50,7 +50,10 @@ public class AHC5HttpRequest extends AbstractHttpRequest {
             header(headerPrefix+"message-key", key);
         }
 
-        httpRequest.setEntity(new ByteBufferEntity(byteBuffer, ContentType.DEFAULT_BINARY));
+		if(null != byteBuffer) {
+        	httpRequest.setEntity(new ByteBufferEntity(byteBuffer, ContentType.DEFAULT_BINARY));
+		}
+
         return this;
     }
 
