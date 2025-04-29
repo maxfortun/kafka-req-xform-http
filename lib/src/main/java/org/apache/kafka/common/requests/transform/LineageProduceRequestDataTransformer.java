@@ -24,11 +24,13 @@ import java.util.Properties;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 import java.time.Duration;
 
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.record.Record;
@@ -36,11 +38,11 @@ import org.apache.kafka.common.record.RecordBatch;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -184,8 +186,21 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
     }
 
 
-    private void updateLineageMap(String lineage, boolean shouldSendToKafka) {
+    private void updateLineageMap(String lineage, boolean shouldSync) {
         log.debug("{}", lineage);
+
+		if(!shouldSync || null == kafkaProducer) {
+			return;
+		}
+		
+		ProducerRecord<String, String> record = new ProducerRecord<>(lineageMapTopicName, null, lineage);
+
+		try {
+			Future<RecordMetadata> future = kafkaProducer.send(record);
+			RecordMetadata metadata = future.get(); // synchronous send
+		} catch(Exception e) {
+        	log.warn("{}", lineage, e);
+		}
     }
 
     private class LineageMapConsumer implements Runnable {
