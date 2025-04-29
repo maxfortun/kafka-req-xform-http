@@ -63,7 +63,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
 
         lineagePrefix = appConfig("prefix", "/");
 
-        if(configured("map", "enabled", false)) {
+        if(configured("map", "true", false)) {
             lineageMapTopicName = appConfig("topic-name", "__lineage");
 			lineageMap = new HashMap<>();
 

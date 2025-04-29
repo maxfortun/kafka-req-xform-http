@@ -46,4 +46,8 @@ httpHeaderPrefix.scopes=(?i)^(app)$
 
 in-headers=(?i)^(env|time|timespan|hostname)$
 in-headers.scopes=(?i)^(app|request)$
+
+map=false
+map.values=(?i)^(true|false)$
+map.scopes=(?i)^(app|request)$
 ```
