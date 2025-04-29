@@ -49,5 +49,15 @@ in-headers.scopes=(?i)^(app|request)$
 
 map=false
 map.values=(?i)^(true|false)$
-map.scopes=(?i)^(app|request)$
+map.scopes=(?i)^(app)$
+
+map-broker=localhost:9092
+map-broker.values=(?i)^(.*:[0-9]*)$
+map-broker.scopes=(?i)^(app)$
+
+map-topic=__lineage
+map-topic.values=(?i)^(__.*)$
+map-topic.scopes=(?i)^(app)$
+
 ```
+

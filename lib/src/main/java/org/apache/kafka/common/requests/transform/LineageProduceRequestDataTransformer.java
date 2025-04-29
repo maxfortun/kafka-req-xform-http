@@ -55,7 +55,8 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
 
     private String lineagePrefix;
 
-    private String lineageMapTopicName = null;
+    private String lineageMapBroker = null;
+    private String lineageMapTopic = null;
     private Map<String, Set<String>> lineageMap = null;
 	private KafkaProducer<String, String> kafkaProducer = null;
 
@@ -65,7 +66,8 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         lineagePrefix = appConfig("prefix", "/");
 
         if(configured("map", "true", false)) {
-            lineageMapTopicName = appConfig("topic-name", "__lineage");
+            lineageMapBroker = appConfig("map-broker", "localhost:9092");
+            lineageMapTopic = appConfig("map-topic", "__lineage");
 			lineageMap = new HashMap<>();
 
             ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -173,7 +175,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
 
     private Properties getProducerProps() {
         Properties props = new Properties();
-        props.put("bootstrap.servers", "localhost:9093");
+        props.put("bootstrap.servers", lineageMapBroker);
         props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         return props;
@@ -189,12 +191,15 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
 
     private void updateLineageMap(String lineage, boolean shouldSync) {
         log.debug("{}", lineage);
+		boolean isUpdated = false;
 
-		if(!shouldSync || null == kafkaProducer) {
+		
+
+		if(!isUpdated || !shouldSync || null == kafkaProducer) {
 			return;
 		}
 		
-		ProducerRecord<String, String> record = new ProducerRecord<>(lineageMapTopicName, null, lineage);
+		ProducerRecord<String, String> record = new ProducerRecord<>(lineageMapTopic, null, lineage);
 
 		try {
 			Future<RecordMetadata> future = kafkaProducer.send(record);
@@ -210,7 +215,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         private LineageMapConsumer(Properties props) {
             consumer = new KafkaConsumer<>(props);
     
-            consumer.subscribe(Collections.singletonList(lineageMapTopicName));
+            consumer.subscribe(Collections.singletonList(lineageMapTopic));
         }
 
         @Override
