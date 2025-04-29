@@ -18,6 +18,7 @@ package org.apache.kafka.common.requests.transform;
 
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
@@ -33,9 +34,13 @@ import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 
-import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+
+import org.apache.kafka.clients.producer.KafkaProducer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,19 +50,26 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
 
     private static final String brokerHostname = System.getenv("HOSTNAME");
 
-	private ExecutorService executor = Executors.newSingleThreadExecutor();
-
     private String lineagePrefix;
-    private String lineageTopicName;
-    private Map<String, String> lineageMap;
+
+    private String lineageMapTopicName = null;
+    private Map<String, String> lineageMap = null;
+	private KafkaProducer<String, String> kafkaProducer = null;
 
     public LineageProduceRequestDataTransformer(String transformerName) {
         super(transformerName);
 
         lineagePrefix = appConfig("prefix", "/");
-        lineageTopicName = appConfig("topic-name", "__lineage");
 
-		executor.submit(new ConsumerWorker());
+        if(configured("map", "enabled", false)) {
+            lineageMapTopicName = appConfig("topic-name", "__lineage");
+			lineageMap = new HashMap<>();
+
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            executor.submit(new LineageMapConsumer(getConsumerProps()));
+
+            kafkaProducer = new KafkaProducer<>(getProducerProps());
+        }
    }
 
     protected Record transform(
@@ -105,6 +117,8 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
 
         String lineage = getLineage(topicProduceData, recordHeaders, key, inDate);
         setHeader(recordHeaders, key, lineage);
+
+		updateLineageMap(lineage, true);
 
         Date outDate = new Date();
         long runTime = outDate.getTime() - inDate.getTime();
@@ -154,24 +168,33 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         return Utils.utf8(header.value());
     }
 
-    private void updateLineageMap(ConsumerRecord record) {
-        log.debug("{}", record);
+    private Properties getProducerProps() {
+        Properties props = new Properties();
+        props.put("bootstrap.servers", "localhost:9093");
+        props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+        props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+        return props;
     }
 
-    private class ConsumerWorker implements Runnable {
+    private Properties getConsumerProps() {
+        Properties props = getProducerProps();
+        props.put("group.id", brokerHostname);
+        props.put("auto.offset.reset", "earliest");
+        return props;
+    }
+
+
+    private void updateLineageMap(String lineage, boolean shouldSendToKafka) {
+        log.debug("{}", lineage);
+    }
+
+    private class LineageMapConsumer implements Runnable {
         private final KafkaConsumer<String, String> consumer;
 
-        private ConsumerWorker() {
-            Properties props = new Properties();
-            props.put("bootstrap.servers", "localhost:9093");
-            props.put("group.id", brokerHostname);
-            props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-            props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-            props.put("auto.offset.reset", "earliest");
-
+        private LineageMapConsumer(Properties props) {
             consumer = new KafkaConsumer<>(props);
     
-            consumer.subscribe(Collections.singletonList(lineageTopicName));
+            consumer.subscribe(Collections.singletonList(lineageMapTopicName));
         }
 
         @Override
@@ -180,7 +203,11 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
                 while (true) {
                     ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
                     for (ConsumerRecord<String, String> record : records) {
-                        updateLineageMap(record);
+						Headers headers = record.headers();
+						Header lineageHeader = headers.lastHeader("lineage");
+						if(null != lineageHeader) {
+                        	updateLineageMap(Utils.utf8(lineageHeader.value()), false);
+						}
                     }
                 }
             } catch (Exception e) {
