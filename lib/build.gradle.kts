@@ -33,6 +33,7 @@ dependencies {
 	implementation("org.slf4j:slf4j-api:1.7.36")
 	implementation("org.slf4j:jul-to-slf4j:1.7.36")
 	implementation("org.apache.httpcomponents.client5:httpclient5:5.4")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.19.0")
 }
 
 testing {

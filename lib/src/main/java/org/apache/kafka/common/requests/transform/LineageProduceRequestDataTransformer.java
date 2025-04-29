@@ -19,6 +19,7 @@ package org.apache.kafka.common.requests.transform;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -45,6 +46,9 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +58,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
     private static final String brokerHostname = System.getenv("HOSTNAME");
 
     private String lineagePrefix;
+    private String lineageSeparator;
 
     private String lineageMapBroker = null;
     private String lineageMapTopic = null;
@@ -64,6 +69,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         super(transformerName);
 
         lineagePrefix = appConfig("prefix", "/");
+        lineageSeparator = appConfig("separator", "/");
 
         if(configured("map", "true", false)) {
             lineageMapBroker = appConfig("map-broker", "localhost:9092");
@@ -193,7 +199,28 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         log.debug("{}", lineage);
 		boolean isUpdated = false;
 
-		
+		String[] segments = lineage.split(lineageSeparator);
+
+		Set<String> parentDescendents = null;
+		for(String segment : segments) {
+			String normalizedSegment = segment.replace(":[0-9]*$", "");
+			Set<String> descendants = lineageMap.get(normalizedSegment);
+			if(null == descendants) {
+				descendants = new HashSet<String>();
+				lineageMap.put(normalizedSegment, descendants);
+				isUpdated = true;
+			}
+
+			if(null != parentDescendents) {
+				if(!parentDescendents.contains(normalizedSegment)) {
+					parentDescendents.add(normalizedSegment);
+					isUpdated = true;
+				}
+			}
+
+			parentDescendents = descendants;
+			
+		}
 
 		if(!isUpdated || !shouldSync || null == kafkaProducer) {
 			return;
@@ -203,7 +230,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
 
 		try {
 			Future<RecordMetadata> future = kafkaProducer.send(record);
-			RecordMetadata metadata = future.get(); // synchronous send
+			RecordMetadata metadata = future.get();
 		} catch(Exception e) {
         	log.warn("{}", lineage, e);
 		}
