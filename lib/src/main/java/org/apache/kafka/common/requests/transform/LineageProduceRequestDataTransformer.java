@@ -21,6 +21,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
@@ -55,7 +56,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
     private String lineagePrefix;
 
     private String lineageMapTopicName = null;
-    private Map<String, String> lineageMap = null;
+    private Map<String, Set<String>> lineageMap = null;
 	private KafkaProducer<String, String> kafkaProducer = null;
 
     public LineageProduceRequestDataTransformer(String transformerName) {
