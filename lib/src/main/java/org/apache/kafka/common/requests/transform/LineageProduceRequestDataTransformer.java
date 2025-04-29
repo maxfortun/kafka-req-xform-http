@@ -16,7 +16,15 @@
  */
 package org.apache.kafka.common.requests.transform;
 
+import java.util.Collections;
 import java.util.Date;
+import java.util.Map;
+import java.util.Properties;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+
+import java.time.Duration;
 
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.header.Header;
@@ -25,18 +33,32 @@ import org.apache.kafka.common.message.ProduceRequestData;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class LineageProduceRequestDataTransformer extends AbstractProduceRequestDataTransformer {
     private static final Logger log = LoggerFactory.getLogger(LineageProduceRequestDataTransformer.class);
 
+    private static final String brokerHostname = System.getenv("HOSTNAME");
+
+	private ExecutorService executor = Executors.newSingleThreadExecutor();
+
     private String lineagePrefix;
+    private String lineageTopicName;
+    private Map<String, String> lineageMap;
 
     public LineageProduceRequestDataTransformer(String transformerName) {
         super(transformerName);
+
         lineagePrefix = appConfig("prefix", "/");
-    }
+        lineageTopicName = appConfig("topic-name", "__lineage");
+
+		executor.submit(new ConsumerWorker());
+   }
 
     protected Record transform(
         ProduceRequestData.TopicProduceData topicProduceData,
@@ -131,5 +153,41 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
 
         return Utils.utf8(header.value());
     }
-}
 
+    private void updateLineageMap(ConsumerRecord record) {
+        log.debug("{}", record);
+    }
+
+    private class ConsumerWorker implements Runnable {
+        private final KafkaConsumer<String, String> consumer;
+
+        private ConsumerWorker() {
+            Properties props = new Properties();
+            props.put("bootstrap.servers", "localhost:9093");
+            props.put("group.id", brokerHostname);
+            props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+            props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+            props.put("auto.offset.reset", "earliest");
+
+            consumer = new KafkaConsumer<>(props);
+    
+            consumer.subscribe(Collections.singletonList(lineageTopicName));
+        }
+
+        @Override
+        public void run() {
+            try {
+                while (true) {
+                    ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
+                    for (ConsumerRecord<String, String> record : records) {
+                        updateLineageMap(record);
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                consumer.close();
+            }
+        }
+    }
+}

@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
 public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDataTransformer {
     private static final Logger log = LoggerFactory.getLogger(HttpProduceRequestDataTransformer.class);
 
-    private final String brokerHostname;
+    private static final String brokerHostname = System.getenv("HOSTNAME");
 
     private final String headerPrefixPattern;
     private final String persistentHeadersPattern;
@@ -52,7 +52,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
     public HttpProduceRequestDataTransformer(String transformerName) throws Exception {
         super(transformerName);
 
-        brokerHostname = System.getenv("HOSTNAME"); 
         headerPrefixPattern = "(?i)^"+headerPrefix+".*$";
         persistentHeadersPattern = appConfig("headers.persistentPattern");
         envHeadersPattern = appConfig("headers.envPattern");
