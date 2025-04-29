@@ -225,8 +225,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
 			return;
 		}
 
-		JSONObject lineageJSONObject = new JSONObject(lineageMap);
-        String lineageJSON = lineageJSONObject.toString();
+		logLineageMap();
 	
 		ProducerRecord<String, String> record = new ProducerRecord<>(lineageMapTopic, null, lineage);
 
@@ -237,6 +236,16 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         	log.warn("{}", lineage, e);
 		}
     }
+
+	private String getLineageMapJSONString() {
+		JSONObject jsonObject = new JSONObject(lineageMap);
+        return jsonObject.toString();
+	}
+
+	private void logLineageMap() {
+        String lineageJSON = getLineageMapJSONString();
+        log.info("{}", lineageJSON);
+	}
 
     private class LineageMapConsumer implements Runnable {
         private final KafkaConsumer<String, String> consumer;
