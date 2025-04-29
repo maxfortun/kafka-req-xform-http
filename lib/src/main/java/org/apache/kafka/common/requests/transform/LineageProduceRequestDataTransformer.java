@@ -46,8 +46,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import org.json.JSONObject;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -225,7 +224,10 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
 		if(!isUpdated || !shouldSync || null == kafkaProducer) {
 			return;
 		}
-		
+
+		JSONObject lineageJSONObject = new JSONObject(lineageMap);
+        String lineageJSON = lineageJSONObject.toString();
+	
 		ProducerRecord<String, String> record = new ProducerRecord<>(lineageMapTopic, null, lineage);
 
 		try {
