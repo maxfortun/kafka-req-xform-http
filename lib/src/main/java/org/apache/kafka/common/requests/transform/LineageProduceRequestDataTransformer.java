@@ -193,8 +193,11 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         return props;
     }
 
-
     private void updateLineageMap(String lineage, boolean shouldSync) {
+		if(null == lineageMap) {
+			return;
+		}
+
         log.debug("{}", lineage);
 		boolean isUpdated = false;
 
