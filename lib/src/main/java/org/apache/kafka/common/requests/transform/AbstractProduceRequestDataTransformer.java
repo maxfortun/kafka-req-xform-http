@@ -89,7 +89,17 @@ public abstract class AbstractProduceRequestDataTransformer extends AbstractTran
                     int recordId = 0;
                     for (Record record : recordBatch) {
 
-                        Record transformedRecord = transform(topicProduceData, partitionProduceData, recordBatch, record, new RecordHeaders(record.headers()), version);
+                        Record transformedRecord = null;
+                        try {
+                            transformedRecord = transform(topicProduceData, partitionProduceData, recordBatch, record, new RecordHeaders(record.headers()), version);
+                        } catch(Throwable t) {
+                            log.warn("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}, {}",
+                                transformerName, batchId, recordId, record,
+                                Utils.toString(record.headers()), Utils.utf8(record.key()), Utils.utf8(record.value()), t
+                            );
+
+                            throw t;
+                        } 
                         memoryRecordsBuilder.append(transformedRecord);
 
                         if(log.isTraceEnabled()) {
