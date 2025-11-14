@@ -148,6 +148,19 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         httpRequest.header(headerPrefix+"hostname", brokerHostname);
         httpRequest.header(headerPrefix+"topic-name", topicProduceData.name());
 
+		String httpHeadersString = reqConfig(recordHeaders, "headers.http");
+		if(null != httpHeadersString) {
+			String[] httpHeadersStrings = httpHeadersString.split("[,\\s]+");
+			for(String httpHeaderString : httpHeadersStrings) {
+				try {
+					String[] tokens = httpHeaderString.split("\\s*=\\s*");
+        			httpRequest.header(tokens[0], tokens[1]);
+				} catch(Exception e) {
+					log.warn("{}", httpHeaderString, e);
+				}
+			}
+		}
+
         String recordKey = null;
         if(null != record.key()) {
             recordKey = Utils.utf8(record.key());
@@ -198,11 +211,11 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             return shouldRemove;
         });
 
-        if(configured("in-headers", "hostname", false)) {
+        if(configured("headers.res", "hostname", false)) {
             resHeadersMap.put(headerPrefix+"hostname", Arrays.asList(brokerHostname));
         }
 
-        if(null != envHeadersPattern && configured(recordHeaders, "in-headers", "env", false)) {
+        if(null != envHeadersPattern && configured(recordHeaders, "headers.res", "env", false)) {
             System.getenv().entrySet().stream()
                 .filter( entry -> {
                     if(entry.getKey().matches(envHeadersPattern)) {
@@ -217,14 +230,14 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         Date outDate = new Date();
         long runTime = outDate.getTime() - inDate.getTime();
 
-        if(configured("in-headers", "time", false)) {
+        if(configured("headers.res", "time", false)) {
             resHeadersMap.put(headerPrefix+"in-time", Arrays.asList(""+inDate.getTime()));
             resHeadersMap.put(headerPrefix+"req-time", Arrays.asList(""+reqDate.getTime()));
             resHeadersMap.put(headerPrefix+"res-time", Arrays.asList(""+resDate.getTime()));
             resHeadersMap.put(headerPrefix+"out-time", Arrays.asList(""+outDate.getTime()));
         }
 
-        if(configured("in-headers", "timespan", false)) {
+        if(configured("headers.res", "timespan", false)) {
             resHeadersMap.put(headerPrefix+"req-timespan", Arrays.asList(""+reqRunTime));
             resHeadersMap.put(headerPrefix+"run-timespan", Arrays.asList(""+runTime));
         }

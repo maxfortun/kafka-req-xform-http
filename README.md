@@ -41,11 +41,13 @@ httpClient.onException=fail
 httpClient.onException.values=(?i)^(fail|pass-thru|original)$
 httpClient.onException.scopes=(?i)^(app|request)$
 
-#httpHeaderPrefix=content-lake-
+httpHeaderPrefix=cl-brk-
 httpHeaderPrefix.scopes=(?i)^(app)$
 
-in-headers=(?i)^(env|time|timespan|hostname)$
-in-headers.scopes=(?i)^(app|request)$
+headers.res=(?i)^(env|time|timespan|hostname)$
+headers.res.scopes=(?i)^(app|request)$
+
+headers.http=cl-api-header-prefix=cl-api-
 
 map=false
 map.values=(?i)^(true|false)$
