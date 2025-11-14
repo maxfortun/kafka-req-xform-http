@@ -17,7 +17,6 @@
 package org.apache.kafka.common.requests.transform;
 
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -28,7 +27,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.Duration;
+import java.time.format.DateTimeFormatter;
 
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.header.Header;
@@ -62,7 +65,9 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
     private String lineageMapBroker = null;
     private String lineageMapTopic = null;
     private Map<String, Set<String>> lineageMap = null;
-	private KafkaProducer<String, String> kafkaProducer = null;
+    private KafkaProducer<String, String> kafkaProducer = null;
+
+    private ZoneId zoneId = ZoneId.systemDefault();
 
     public LineageProduceRequestDataTransformer(String transformerName) {
         super(transformerName);
@@ -73,7 +78,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         if(configured("map", "true", false)) {
             lineageMapBroker = appConfig("map-broker", "localhost:9092");
             lineageMapTopic = appConfig("map-topic", "__lineage");
-			lineageMap = new HashMap<>();
+            lineageMap = new HashMap<>();
 
             ExecutorService executor = Executors.newSingleThreadExecutor();
             executor.submit(new LineageMapConsumer(getConsumerProps()));
@@ -118,24 +123,24 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
             return record;
         }
 
-        Date inDate = new Date();
+        LocalDateTime inDateTime = LocalDateTime.now();
 
         String key = reqConfig(recordHeaders, "key");
         if(null == key) {
             key = transformerName;
         }
 
-        String lineage = getLineage(topicProduceData, recordHeaders, key, inDate);
+        String lineage = getLineage(topicProduceData, recordHeaders, key, inDateTime);
         setHeader(recordHeaders, key, lineage);
 
-		updateLineageMap(lineage, true);
+        updateLineageMap(lineage, true);
 
-        Date outDate = new Date();
-        long runTime = outDate.getTime() - inDate.getTime();
+        LocalDateTime outDateTime = LocalDateTime.now();
+        long runTime = Duration.between(outDateTime, inDateTime).toMillis();
 
         if(configured("in-headers", "time", false)) {
-            setHeader(recordHeaders, headerPrefix+"in-time", ""+inDate.getTime());
-            setHeader(recordHeaders, headerPrefix+"out-time", ""+outDate.getTime());
+            setHeader(recordHeaders, headerPrefix+"in-time", formatDateTime(inDateTime, recordHeaders));
+            setHeader(recordHeaders, headerPrefix+"out-time", formatDateTime(outDateTime, recordHeaders));
         }
 
         if(configured("in-headers", "timespan", false)) {
@@ -146,10 +151,10 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         return newRecord(recordBatch, record, recordHeaders.toArray(), record.value());
     }
 
-    private String getLineage(ProduceRequestData.TopicProduceData topicProduceData, RecordHeaders recordHeaders, String key, Date inDate) {
+    private String getLineage(ProduceRequestData.TopicProduceData topicProduceData, RecordHeaders recordHeaders, String key, LocalDateTime inDateTime) {
         String lineage = getCurrentLineage(recordHeaders, key)+lineagePrefix+topicProduceData.name();
         if(configured(recordHeaders, "in-time", "true", false)) {
-            lineage += ":"+inDate.getTime();
+            lineage += ":"+formatDateTime(inDateTime, recordHeaders);
         }
         return lineage;
     }
@@ -178,6 +183,19 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         return Utils.utf8(header.value());
     }
 
+    private String formatDateTime(LocalDateTime localDateTime, RecordHeaders recordHeaders) {
+        String formatString = reqConfig(recordHeaders, "time-fmt");
+        if(null != formatString) {
+            try {
+                DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern(formatString);
+                return localDateTime.format(dateTimeFormatter);
+            } catch(Exception e) {
+                log.warn("{}", formatString, e);
+            }
+        }
+        return ""+localDateTime.atZone(zoneId).toInstant().toEpochMilli();
+    }
+
     private Properties getProducerProps() {
         Properties props = new Properties();
         props.put("bootstrap.servers", lineageMapBroker);
@@ -194,61 +212,61 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
     }
 
     private void updateLineageMap(String lineage, boolean shouldSync) {
-		if(null == lineageMap) {
-			return;
-		}
+        if(null == lineageMap) {
+            return;
+        }
 
         log.debug("{}", lineage);
-		boolean isUpdated = false;
+        boolean isUpdated = false;
 
-		String[] segments = lineage.split(lineageSeparator);
+        String[] segments = lineage.split(lineageSeparator);
 
-		Set<String> parentDescendents = null;
-		for(String segment : segments) {
-			String normalizedSegment = segment.replace(":[0-9]*$", "");
-			Set<String> descendants = lineageMap.get(normalizedSegment);
-			if(null == descendants) {
-				descendants = new HashSet<String>();
-				lineageMap.put(normalizedSegment, descendants);
-				isUpdated = true;
-			}
+        Set<String> parentDescendents = null;
+        for(String segment : segments) {
+            String normalizedSegment = segment.replace(":[0-9]*$", "");
+            Set<String> descendants = lineageMap.get(normalizedSegment);
+            if(null == descendants) {
+                descendants = new HashSet<String>();
+                lineageMap.put(normalizedSegment, descendants);
+                isUpdated = true;
+            }
 
-			if(null != parentDescendents) {
-				if(!parentDescendents.contains(normalizedSegment)) {
-					parentDescendents.add(normalizedSegment);
-					isUpdated = true;
-				}
-			}
+            if(null != parentDescendents) {
+                if(!parentDescendents.contains(normalizedSegment)) {
+                    parentDescendents.add(normalizedSegment);
+                    isUpdated = true;
+                }
+            }
 
-			parentDescendents = descendants;
-			
-		}
+            parentDescendents = descendants;
+            
+        }
 
-		if(!isUpdated || !shouldSync || null == kafkaProducer) {
-			return;
-		}
+        if(!isUpdated || !shouldSync || null == kafkaProducer) {
+            return;
+        }
 
-		logLineageMap();
-	
-		ProducerRecord<String, String> record = new ProducerRecord<>(lineageMapTopic, null, lineage);
+        logLineageMap();
+    
+        ProducerRecord<String, String> record = new ProducerRecord<>(lineageMapTopic, null, lineage);
 
-		try {
-			Future<RecordMetadata> future = kafkaProducer.send(record);
-			RecordMetadata metadata = future.get();
-		} catch(Exception e) {
-        	log.warn("{}", lineage, e);
-		}
+        try {
+            Future<RecordMetadata> future = kafkaProducer.send(record);
+            RecordMetadata metadata = future.get();
+        } catch(Exception e) {
+            log.warn("{}", lineage, e);
+        }
     }
 
-	private String getLineageMapJSONString() {
-		JSONObject jsonObject = new JSONObject(lineageMap);
+    private String getLineageMapJSONString() {
+        JSONObject jsonObject = new JSONObject(lineageMap);
         return jsonObject.toString();
-	}
+    }
 
-	private void logLineageMap() {
+    private void logLineageMap() {
         String lineageJSON = getLineageMapJSONString();
         log.info("{}", lineageJSON);
-	}
+    }
 
     private class LineageMapConsumer implements Runnable {
         private final KafkaConsumer<String, String> consumer;
@@ -265,11 +283,11 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
                 while (true) {
                     ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
                     for (ConsumerRecord<String, String> record : records) {
-						Headers headers = record.headers();
-						Header lineageHeader = headers.lastHeader("lineage");
-						if(null != lineageHeader) {
-                        	updateLineageMap(Utils.utf8(lineageHeader.value()), false);
-						}
+                        Headers headers = record.headers();
+                        Header lineageHeader = headers.lastHeader("lineage");
+                        if(null != lineageHeader) {
+                            updateLineageMap(Utils.utf8(lineageHeader.value()), false);
+                        }
                     }
                 }
             } catch (Exception e) {
