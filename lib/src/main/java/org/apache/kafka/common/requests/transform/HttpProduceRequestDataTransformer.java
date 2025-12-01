@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.header.Header;
@@ -148,18 +149,18 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         httpRequest.header(headerPrefix+"hostname", brokerHostname);
         httpRequest.header(headerPrefix+"topic-name", topicProduceData.name());
 
-		String httpHeadersString = reqConfig(recordHeaders, "headers.http");
-		if(null != httpHeadersString) {
-			String[] httpHeadersStrings = httpHeadersString.split("[,\\s]+");
-			for(String httpHeaderString : httpHeadersStrings) {
-				try {
-					String[] tokens = httpHeaderString.split("\\s*=\\s*");
-        			httpRequest.header(tokens[0], tokens[1]);
-				} catch(Exception e) {
-					log.warn("{}", httpHeaderString, e);
-				}
-			}
-		}
+        String httpHeadersString = reqConfig(recordHeaders, "headers.http");
+        if(null != httpHeadersString) {
+            String[] httpHeadersStrings = httpHeadersString.split("[,\\s]+");
+            for(String httpHeaderString : httpHeadersStrings) {
+                try {
+                    String[] tokens = httpHeaderString.split("\\s*=\\s*");
+                    httpRequest.header(tokens[0], tokens[1]);
+                } catch(Exception e) {
+                    log.warn("{}", httpHeaderString, e);
+                }
+            }
+        }
 
         String recordKey = null;
         if(null != record.key()) {
@@ -177,6 +178,12 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             HttpResponse httpResponse = httpClient.send(httpRequest);
             log.debug("{}: httpResponse {}", transformerName, httpResponse);
             if(httpResponse.statusCode() != 200) {
+                String headersString = httpResponse.headers().entrySet().stream()
+                    .map(entry -> entry.getKey() + ": " + String.join(", ", entry.getValue()))
+                    .collect(Collectors.joining("\n"));
+
+                log.warn("{}: httpResponse {}\n{}\n{}", transformerName, httpResponse, headersString, new String(httpResponse.body()));
+
                 String onHttpException = reqConfig(recordHeaders, "httpClient.onException");
 
                 if("original".equalsIgnoreCase(onHttpException)) {
