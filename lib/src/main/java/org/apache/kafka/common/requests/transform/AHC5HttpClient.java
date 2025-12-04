@@ -32,6 +32,7 @@ import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.pool.PoolConcurrencyPolicy;
 import org.apache.hc.core5.pool.PoolReusePolicy;
+import org.apache.hc.core5.pool.PoolStats;
 import org.apache.hc.core5.util.Timeout;
 import org.apache.hc.core5.util.TimeValue;
 
@@ -42,11 +43,13 @@ public class AHC5HttpClient extends AbstractHttpClient {
     private static final Logger log = LoggerFactory.getLogger(AHC5HttpClient.class);
 
     private final CloseableHttpClient httpClient;
+    private PoolingHttpClientConnectionManager connectionManager;
+    private PoolStats poolStats;
 
     public AHC5HttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
         super(httpProduceRequestDataTransformer);
 
-        PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
+        connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
             .setDefaultSocketConfig(
                 SocketConfig.custom()
                 .setTcpNoDelay(true)
@@ -66,6 +69,8 @@ public class AHC5HttpClient extends AbstractHttpClient {
             .setMaxConnPerRoute(25)
             .setMaxConnTotal(500)
             .build();
+
+        poolStats = connectionManager.getTotalStats();
 
         httpClient = HttpClients.custom()
             .setConnectionManager(connectionManager)
@@ -88,10 +93,23 @@ public class AHC5HttpClient extends AbstractHttpClient {
     }
 
     public HttpResponse send(AbstractHttpRequest httpRequest) throws Exception {
+        logPoolStats();
         return httpClient.execute(((AHC5HttpRequest)httpRequest).httpRequest(), httpResponse -> { 
             return new AHC5HttpResponse((AHC5HttpRequest)httpRequest, httpResponse);
         });
     }
 
+    private void logPoolStats() {
+        if(!log.isInfoEnabled()) {
+            return;
+        }
+
+        PoolStats newPoolStats = connectionManager.getTotalStats();
+        if(newPoolStats.getPending() == poolStats.getPending()) {
+            return;
+        }
+        poolStats = newPoolStats;
+        log.info("{}: connections: { max: {}, leased: {}, avail: {}, pending: {} }", httpProduceRequestDataTransformer.transformerName, poolStats.getMax(), poolStats.getLeased(), poolStats.getAvailable(), poolStats.getPending());
+    }
 }
 
