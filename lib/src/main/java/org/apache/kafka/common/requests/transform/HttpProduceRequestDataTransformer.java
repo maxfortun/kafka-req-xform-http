@@ -76,7 +76,34 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 version
             );
         } catch(Exception e) {
-            log.debug("{}", transformerName, e);
+            log.warn("{}: transform failed", transformerName, e);
+
+            String onException = reqConfig(recordHeaders, "onException");
+
+            if ("original".equalsIgnoreCase(onException)) {
+                log.debug("{}: onException=original, returning original record", transformerName);
+                return record;
+            }
+
+            if ("headers".equalsIgnoreCase(onException)) {
+                log.debug("{}: onException=headers, returning record with error headers", transformerName);
+                try {
+                    recordHeaders.remove(headerPrefix + "error");
+                    recordHeaders.remove(headerPrefix + "error-class");
+                    recordHeaders.remove(headerPrefix + "error-message");
+                    recordHeaders.add(headerPrefix + "error", "true".getBytes(StandardCharsets.UTF_8));
+                    recordHeaders.add(headerPrefix + "error-class", e.getClass().getName().getBytes(StandardCharsets.UTF_8));
+                    if (e.getMessage() != null) {
+                        recordHeaders.add(headerPrefix + "error-message", e.getMessage().getBytes(StandardCharsets.UTF_8));
+                    }
+                    return newRecord(recordBatch, record, recordHeaders.toArray(), record.value());
+                } catch (Exception innerEx) {
+                    log.error("{}: failed to create error record", transformerName, innerEx);
+                    throw new InvalidRequestException(transformerName, e);
+                }
+            }
+
+            // Default behavior: throw
             throw new InvalidRequestException(transformerName, e);
         }
     }
