@@ -88,14 +88,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             if ("headers".equalsIgnoreCase(onException)) {
                 log.debug("{}: onException=headers, returning record with error headers", transformerName);
                 try {
-                    recordHeaders.remove(headerPrefix + "error");
-                    recordHeaders.remove(headerPrefix + "error-class");
-                    recordHeaders.remove(headerPrefix + "error-message");
-                    recordHeaders.add(headerPrefix + "error", "true".getBytes(StandardCharsets.UTF_8));
-                    recordHeaders.add(headerPrefix + "error-class", e.getClass().getName().getBytes(StandardCharsets.UTF_8));
-                    if (e.getMessage() != null) {
-                        recordHeaders.add(headerPrefix + "error-message", e.getMessage().getBytes(StandardCharsets.UTF_8));
-                    }
+                    addErrorHeaders(recordHeaders, e);
                     return newRecord(recordBatch, record, recordHeaders.toArray(), record.value());
                 } catch (Exception innerEx) {
                     log.error("{}: failed to create error record", transformerName, innerEx);
@@ -103,8 +96,39 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 }
             }
 
+            if ("dlq".equalsIgnoreCase(onException)) {
+                log.debug("{}: onException=dlq, routing record to dead-letter queue", transformerName);
+                try {
+                    addErrorHeaders(recordHeaders, e);
+                    String dlqTopic = reqConfig(recordHeaders, "onException.dlqTopic");
+                    if (dlqTopic == null || dlqTopic.isEmpty()) {
+                        dlqTopic = topicProduceData.name() + "-dlq";
+                    }
+                    recordHeaders.remove(headerPrefix + "dlq-topic");
+                    recordHeaders.add(headerPrefix + "dlq-topic", dlqTopic.getBytes(StandardCharsets.UTF_8));
+                    recordHeaders.remove(headerPrefix + "original-topic");
+                    recordHeaders.add(headerPrefix + "original-topic", topicProduceData.name().getBytes(StandardCharsets.UTF_8));
+                    log.debug("{}: record will be routed to DLQ topic: {}", transformerName, dlqTopic);
+                    return newRecord(recordBatch, record, recordHeaders.toArray(), record.value());
+                } catch (Exception innerEx) {
+                    log.error("{}: failed to create DLQ record", transformerName, innerEx);
+                    throw new InvalidRequestException(transformerName, e);
+                }
+            }
+
             // Default behavior: throw
             throw new InvalidRequestException(transformerName, e);
+        }
+    }
+
+    private void addErrorHeaders(RecordHeaders recordHeaders, Exception e) {
+        recordHeaders.remove(headerPrefix + "error");
+        recordHeaders.remove(headerPrefix + "error-class");
+        recordHeaders.remove(headerPrefix + "error-message");
+        recordHeaders.add(headerPrefix + "error", "true".getBytes(StandardCharsets.UTF_8));
+        recordHeaders.add(headerPrefix + "error-class", e.getClass().getName().getBytes(StandardCharsets.UTF_8));
+        if (e.getMessage() != null) {
+            recordHeaders.add(headerPrefix + "error-message", e.getMessage().getBytes(StandardCharsets.UTF_8));
         }
     }
 

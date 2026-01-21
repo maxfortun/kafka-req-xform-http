@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,6 +60,10 @@ public abstract class AbstractProduceRequestDataTransformer extends AbstractTran
 
     public ProduceRequestData transform(ProduceRequestData produceRequestDataIn, short version) {
         ProduceRequestData produceRequestDataOut = produceRequestDataIn.duplicate();
+
+        // Track DLQ topics: dlqTopic -> partitionIndex -> MemoryRecordsBuilder
+        Map<String, Map<Integer, MemoryRecordsBuilder>> dlqBuilders = new HashMap<>();
+        String dlqTopicHeader = headerPrefix + "dlq-topic";
 
         for (RawTaggedField rawTaggedField : produceRequestDataOut.unknownTaggedFields()) {
             log.debug("{}: rawTaggedField {} = {}", transformerName, rawTaggedField.tag(), Utils.utf8(rawTaggedField.data()));
@@ -99,8 +104,20 @@ public abstract class AbstractProduceRequestDataTransformer extends AbstractTran
                             );
 
                             throw t;
-                        } 
-                        memoryRecordsBuilder.append(transformedRecord);
+                        }
+
+                        // Check if record should be routed to DLQ
+                        String dlqTopic = getDlqTopic(transformedRecord, dlqTopicHeader);
+                        if (dlqTopic != null) {
+                            // Route to DLQ topic
+                            log.debug("{}: routing record to DLQ topic: {}", transformerName, dlqTopic);
+                            Record dlqRecord = removeDlqHeader(recordBatch, transformedRecord, dlqTopicHeader);
+                            MemoryRecordsBuilder dlqBuilder = getDlqBuilder(dlqBuilders, dlqTopic, partitionProduceData.index(), memoryRecords.sizeInBytes());
+                            dlqBuilder.append(dlqRecord);
+                        } else {
+                            // Normal routing to original topic
+                            memoryRecordsBuilder.append(transformedRecord);
+                        }
 
                         if(log.isTraceEnabled()) {
                             log.trace("{}: topicProduceData.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
@@ -124,7 +141,55 @@ public abstract class AbstractProduceRequestDataTransformer extends AbstractTran
             }
         }
 
+        // Add DLQ topics to the output
+        for (Map.Entry<String, Map<Integer, MemoryRecordsBuilder>> dlqEntry : dlqBuilders.entrySet()) {
+            String dlqTopicName = dlqEntry.getKey();
+            ProduceRequestData.TopicProduceData dlqTopicData = new ProduceRequestData.TopicProduceData();
+            dlqTopicData.setName(dlqTopicName);
+
+            for (Map.Entry<Integer, MemoryRecordsBuilder> partitionEntry : dlqEntry.getValue().entrySet()) {
+                ProduceRequestData.PartitionProduceData dlqPartitionData = new ProduceRequestData.PartitionProduceData();
+                dlqPartitionData.setIndex(partitionEntry.getKey());
+                dlqPartitionData.setRecords(partitionEntry.getValue().build());
+                dlqTopicData.partitionData().add(dlqPartitionData);
+            }
+
+            log.debug("{}: adding DLQ topic {} with {} partitions", transformerName, dlqTopicName, dlqTopicData.partitionData().size());
+            produceRequestDataOut.topicData().add(dlqTopicData);
+        }
+
         return produceRequestDataOut;
+    }
+
+    private String getDlqTopic(Record record, String dlqTopicHeader) {
+        for (Header header : record.headers()) {
+            if (dlqTopicHeader.equals(header.key())) {
+                return Utils.utf8(header.value());
+            }
+        }
+        return null;
+    }
+
+    private MemoryRecordsBuilder getDlqBuilder(Map<String, Map<Integer, MemoryRecordsBuilder>> dlqBuilders, String dlqTopic, int partitionIndex, int initialSize) {
+        return dlqBuilders
+            .computeIfAbsent(dlqTopic, k -> new HashMap<>())
+            .computeIfAbsent(partitionIndex, k -> MemoryRecords.builder(
+                ByteBuffer.allocate(initialSize),
+                CompressionType.NONE,
+                TimestampType.CREATE_TIME,
+                0L
+            ));
+    }
+
+    private Record removeDlqHeader(RecordBatch recordBatch, Record record, String dlqTopicHeader) {
+        try {
+            RecordHeaders headers = new RecordHeaders(record.headers());
+            headers.remove(dlqTopicHeader);
+            return newRecord(recordBatch, record, headers.toArray(), record.value());
+        } catch (Exception e) {
+            log.warn("{}: failed to remove DLQ header, using original record", transformerName, e);
+            return record;
+        }
     }
 
     protected abstract Record transform(
