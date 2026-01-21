@@ -19,7 +19,21 @@ All headers have a prefix of `plugin prefx`-`broker`-.
 |uri|||Uri of the service to forward requests to. Overrides default.|
 |enable|true|true,false|Is forwarding to service enabled?|
 |headers.in||env,time,timespan,hostname|Include in response headers|
-|httpClient.onException|fail|fail,pass-thru,original|Exception handling behavior|
+|httpClient.onException|fail|fail,pass-thru,original|HTTP response error handling behavior|
+|onException|throw|throw,headers,original|Transform exception handling behavior|
+
+#### onException Values
+
+| Value | Behavior |
+|-------|----------|
+| `throw` | Throws `InvalidRequestException`, breaks connection (default) |
+| `headers` | Returns record with error info in headers, connection stays open |
+| `original` | Returns original record unchanged, transformation skipped |
+
+When `onException=headers`, the following headers are added to the record:
+- `{headerPrefix}error` = `"true"`
+- `{headerPrefix}error-class` = exception class name (e.g., `java.net.ConnectException`)
+- `{headerPrefix}error-message` = exception message (if present)
 
 ### Sample config
 ```
@@ -40,6 +54,10 @@ topics.namePattern.scopes=(?i)^(app)$
 httpClient.onException=fail
 httpClient.onException.values=(?i)^(fail|pass-thru|original)$
 httpClient.onException.scopes=(?i)^(app|request)$
+
+onException=throw
+onException.values=(?i)^(throw|headers|original)$
+onException.scopes=(?i)^(app|request)$
 
 httpHeaderPrefix=cl-brk-
 httpHeaderPrefix.scopes=(?i)^(app)$
