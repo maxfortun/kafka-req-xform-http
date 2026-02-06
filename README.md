@@ -248,6 +248,33 @@ Intercepts OffsetCommit requests and makes HTTP requests when consumers commit t
 | httpClient.onException | fail | fail,pass-thru,ignore | HTTP error handling behavior |
 | onException | throw | throw,ignore | Transform exception handling |
 | headers.http | | key=value pairs | Additional HTTP headers to include |
+| **batch.count** | 1 | integer | Send HTTP after N commits (1 = no batching) |
+| **batch.intervalMs** | 0 | milliseconds | Send HTTP after N ms elapsed (0 = disabled) |
+
+### Batching
+
+To reduce HTTP overhead, you can configure batching to only send requests periodically:
+
+```properties
+# Send HTTP request every 100 commits OR every 5 seconds (whichever comes first)
+batch.count=100
+batch.intervalMs=5000
+```
+
+**How it works:**
+- Tracks state per `groupId:topic:partition`
+- Only the **latest** offset is sent (intermediate offsets are skipped)
+- HTTP request is sent when either threshold is reached
+- Since offset commits are cumulative, skipping intermediate commits loses no information
+
+**Example scenarios:**
+
+| batch.count | batch.intervalMs | Behavior |
+|-------------|------------------|----------|
+| 1 (default) | 0 (default) | Send every commit (no batching) |
+| 100 | 0 | Send every 100th commit |
+| 0 | 5000 | Send at most every 5 seconds |
+| 100 | 5000 | Send every 100 commits OR 5 seconds |
 
 ### HTTP Request Format
 
@@ -303,6 +330,10 @@ uri=http://my-service/offset-commit-hook
 httpClient.class=org.apache.kafka.common.requests.transform.AHC5HttpClient
 httpClient.socketTimeout=30
 httpClient.connectTimeout=10
+
+# Batching - reduce HTTP overhead
+batch.count=100
+batch.intervalMs=5000
 
 # Filtering (optional)
 groups.idPattern=^my-app-.*$

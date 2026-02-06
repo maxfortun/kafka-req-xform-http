@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.common.errors.InvalidRequestException;
@@ -38,9 +39,36 @@ public class HttpOffsetCommitRequestDataTransformer extends AbstractOffsetCommit
 
     private final String headerPrefixPattern;
 
+    // Batching configuration
+    private final int batchCount;
+    private final long batchIntervalMs;
+
+    // State tracking per partition: key = "groupId:topic:partition"
+    private final ConcurrentHashMap<String, PartitionState> partitionStates = new ConcurrentHashMap<>();
+
+    private static class PartitionState {
+        volatile long lastSentTimestamp = 0;
+        volatile long lastSentOffset = -1;
+        volatile int commitsSinceLastSend = 0;
+
+        // Latest commit data (to send when flushing)
+        volatile OffsetCommitRequestData latestRequest;
+        volatile OffsetCommitRequestData.OffsetCommitRequestTopic latestTopic;
+        volatile OffsetCommitRequestData.OffsetCommitRequestPartition latestPartition;
+    }
+
     public HttpOffsetCommitRequestDataTransformer(String transformerName) throws Exception {
         super(transformerName);
         headerPrefixPattern = "(?i)^" + headerPrefix + ".*$";
+
+        // Parse batching configuration
+        String batchCountStr = appConfig("batch.count");
+        batchCount = (batchCountStr != null) ? Integer.parseInt(batchCountStr) : 1;
+
+        String batchIntervalStr = appConfig("batch.intervalMs");
+        batchIntervalMs = (batchIntervalStr != null) ? Long.parseLong(batchIntervalStr) : 0;
+
+        log.info("{}: batching configured with count={}, intervalMs={}", transformerName, batchCount, batchIntervalMs);
     }
 
     @Override
@@ -51,7 +79,7 @@ public class HttpOffsetCommitRequestDataTransformer extends AbstractOffsetCommit
         short version
     ) {
         try {
-            transformImpl(request, topic, partition, version);
+            transformWithBatching(request, topic, partition, version);
         } catch (Exception e) {
             log.warn("{}: transform failed for group={} topic={} partition={}",
                 transformerName, request.groupId(), topic.name(), partition.partitionIndex(), e);
@@ -68,7 +96,7 @@ public class HttpOffsetCommitRequestDataTransformer extends AbstractOffsetCommit
         throw new InvalidRequestException(transformerName, e);
     }
 
-    private void transformImpl(
+    private void transformWithBatching(
         OffsetCommitRequestData request,
         OffsetCommitRequestData.OffsetCommitRequestTopic topic,
         OffsetCommitRequestData.OffsetCommitRequestPartition partition,
@@ -81,6 +109,72 @@ public class HttpOffsetCommitRequestDataTransformer extends AbstractOffsetCommit
             return;
         }
 
+        // No batching - send immediately
+        if (batchCount <= 1 && batchIntervalMs <= 0) {
+            sendHttpRequest(request, topic, partition, recordHeaders);
+            return;
+        }
+
+        // Batching enabled - track state
+        String partitionKey = request.groupId() + ":" + topic.name() + ":" + partition.partitionIndex();
+        long now = System.currentTimeMillis();
+
+        PartitionState state = partitionStates.computeIfAbsent(partitionKey, k -> new PartitionState());
+
+        synchronized (state) {
+            // Update latest data
+            state.latestRequest = request;
+            state.latestTopic = topic;
+            state.latestPartition = partition;
+            state.commitsSinceLastSend++;
+
+            boolean shouldSend = false;
+            String reason = null;
+
+            // Check count threshold
+            if (batchCount > 0 && state.commitsSinceLastSend >= batchCount) {
+                shouldSend = true;
+                reason = "count threshold reached (" + state.commitsSinceLastSend + " >= " + batchCount + ")";
+            }
+
+            // Check time threshold
+            if (!shouldSend && batchIntervalMs > 0 && state.lastSentTimestamp > 0) {
+                long elapsed = now - state.lastSentTimestamp;
+                if (elapsed >= batchIntervalMs) {
+                    shouldSend = true;
+                    reason = "time threshold reached (" + elapsed + "ms >= " + batchIntervalMs + "ms)";
+                }
+            }
+
+            // First commit for this partition - initialize timestamp but don't send yet (unless count=1)
+            if (state.lastSentTimestamp == 0) {
+                state.lastSentTimestamp = now;
+                if (batchCount <= 1) {
+                    shouldSend = true;
+                    reason = "first commit";
+                }
+            }
+
+            if (shouldSend) {
+                log.debug("{}: sending batched commit for {} - {}", transformerName, partitionKey, reason);
+                sendHttpRequest(state.latestRequest, state.latestTopic, state.latestPartition, recordHeaders);
+                state.lastSentTimestamp = now;
+                state.lastSentOffset = partition.committedOffset();
+                state.commitsSinceLastSend = 0;
+            } else {
+                log.trace("{}: batching commit for {} (count={}, elapsed={}ms)",
+                    transformerName, partitionKey, state.commitsSinceLastSend,
+                    state.lastSentTimestamp > 0 ? (now - state.lastSentTimestamp) : 0);
+            }
+        }
+    }
+
+    private void sendHttpRequest(
+        OffsetCommitRequestData request,
+        OffsetCommitRequestData.OffsetCommitRequestTopic topic,
+        OffsetCommitRequestData.OffsetCommitRequestPartition partition,
+        RecordHeaders recordHeaders
+    ) throws Exception {
         Date inDate = new Date();
 
         AbstractHttpClient httpClient = HttpClients.getHttpClient(recordHeaders, this);
