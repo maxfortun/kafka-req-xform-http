@@ -36,7 +36,7 @@ public class AHC5HttpRequest extends AbstractHttpRequest {
     public AHC5HttpRequest(AHC5HttpClient httpClient, String uri) throws Exception {
         super(uri);
         this.httpClient = httpClient;
-        headerPrefix = httpClient.httpProduceRequestDataTransformer.headerPrefix;
+        headerPrefix = httpClient.transformer.headerPrefix;
         httpRequest = new HttpPost(uri);
     }
 

@@ -34,7 +34,7 @@ public class JDKHttpRequest extends AbstractHttpRequest {
     public JDKHttpRequest(JDKHttpClient httpClient, String uri) throws Exception {
         super(uri);
         this.httpClient = httpClient;
-        headerPrefix = httpClient.httpProduceRequestDataTransformer.headerPrefix;
+        headerPrefix = httpClient.transformer.headerPrefix;
         httpRequestBuilder.uri(new URI(uri));
     }
 

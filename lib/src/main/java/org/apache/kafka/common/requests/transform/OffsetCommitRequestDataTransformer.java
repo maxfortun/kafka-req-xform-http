@@ -16,14 +16,8 @@
  */
 package org.apache.kafka.common.requests.transform;
 
-public abstract class AbstractHttpClient {
+import org.apache.kafka.common.message.OffsetCommitRequestData;
 
-    protected AbstractTransformer transformer;
-
-    public AbstractHttpClient(AbstractTransformer transformer) {
-        this.transformer = transformer;
-    }
-
-    public abstract AbstractHttpRequest newHttpRequest(String uri) throws Exception;
-    public abstract HttpResponse send(AbstractHttpRequest httpRequest) throws Exception;
+public interface OffsetCommitRequestDataTransformer {
+    public OffsetCommitRequestData transform(OffsetCommitRequestData offsetCommitRequestData, short version);
 }

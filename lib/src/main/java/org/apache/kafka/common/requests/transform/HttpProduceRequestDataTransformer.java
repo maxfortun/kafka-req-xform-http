@@ -199,6 +199,8 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
         httpRequest.header(headerPrefix+"hostname", brokerHostname);
         httpRequest.header(headerPrefix+"topic-name", topicProduceData.name());
+        httpRequest.header(headerPrefix+"partition-index", String.valueOf(partitionProduceData.index()));
+        httpRequest.header(headerPrefix+"record-offset", String.valueOf(record.offset()));
 
         String httpHeadersString = reqConfig(recordHeaders, "headers.http");
         if(null != httpHeadersString) {

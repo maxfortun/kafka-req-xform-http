@@ -29,20 +29,24 @@ import org.slf4j.LoggerFactory;
 public class HttpClients {
     private static final Logger log = LoggerFactory.getLogger(HttpClients.class);
 
-    private final static Class[] httpClientConstructorParameterTypes = new Class[] {HttpProduceRequestDataTransformer.class};
+    private final static Class[] httpClientConstructorParameterTypes = new Class[] {AbstractTransformer.class};
 
     private static Map<String, AbstractHttpClient> httpClients = new HashMap<String, AbstractHttpClient>();
 
-    private static AbstractHttpClient newHttpClient(String httpClientClassName, HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) throws Exception {
+    private static AbstractHttpClient newHttpClient(String httpClientClassName, AbstractTransformer transformer) throws Exception {
         Class<?> httpClientClass = Class.forName(httpClientClassName);
         Constructor<?> httpClientConstructor = httpClientClass.getConstructor(httpClientConstructorParameterTypes);
-        AbstractHttpClient httpClient = (AbstractHttpClient)httpClientConstructor.newInstance(new Object[] {httpProduceRequestDataTransformer});
+        AbstractHttpClient httpClient = (AbstractHttpClient)httpClientConstructor.newInstance(new Object[] {transformer});
         log.info("Created {}.", httpClient.getClass());
         return httpClient;
     }
 
     public static AbstractHttpClient getHttpClient(RecordHeaders recordHeaders, HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) throws Exception {
-        String httpClientClassName = httpProduceRequestDataTransformer.reqConfig(recordHeaders, "httpClient.class");
+        return getHttpClient(recordHeaders, (AbstractTransformer) httpProduceRequestDataTransformer);
+    }
+
+    public static AbstractHttpClient getHttpClient(RecordHeaders recordHeaders, AbstractTransformer transformer) throws Exception {
+        String httpClientClassName = transformer.reqConfig(recordHeaders, "httpClient.class");
         AbstractHttpClient httpClient = httpClients.get(httpClientClassName);
         if(null != httpClient) {
             return httpClient;
@@ -54,7 +58,7 @@ public class HttpClients {
                 return httpClient;
             }
 
-            httpClient = newHttpClient(httpClientClassName, httpProduceRequestDataTransformer);
+            httpClient = newHttpClient(httpClientClassName, transformer);
             httpClients.put(httpClientClassName, httpClient);
             return httpClient;
         }

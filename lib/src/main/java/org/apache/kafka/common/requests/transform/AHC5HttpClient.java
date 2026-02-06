@@ -46,8 +46,8 @@ public class AHC5HttpClient extends AbstractHttpClient {
     private PoolingHttpClientConnectionManager connectionManager;
     private PoolStats poolStats;
 
-    public AHC5HttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
-        super(httpProduceRequestDataTransformer);
+    public AHC5HttpClient(AbstractTransformer transformer) {
+        super(transformer);
 
         connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
             .setDefaultSocketConfig(
@@ -79,12 +79,12 @@ public class AHC5HttpClient extends AbstractHttpClient {
     }
 
     private Timeout appTimeout(String key) {
-        String string = httpProduceRequestDataTransformer.appConfig("httpClient."+key);
+        String string = transformer.appConfig("httpClient."+key);
         if(null == string || string.isEmpty()) {
             return Timeout.INFINITE;
         }
         Timeout timeout = Timeout.ofSeconds(Long.parseLong(string));
-        log.debug("{}: {}={}", httpProduceRequestDataTransformer.transformerName, key, timeout);
+        log.debug("{}: {}={}", transformer.transformerName, key, timeout);
         return timeout;
     }
 
@@ -109,7 +109,7 @@ public class AHC5HttpClient extends AbstractHttpClient {
             return;
         }
         poolStats = newPoolStats;
-        log.info("{}: connections: { max: {}, leased: {}, avail: {}, pending: {} }", httpProduceRequestDataTransformer.transformerName, poolStats.getMax(), poolStats.getLeased(), poolStats.getAvailable(), poolStats.getPending());
+        log.info("{}: connections: { max: {}, leased: {}, avail: {}, pending: {} }", transformer.transformerName, poolStats.getMax(), poolStats.getLeased(), poolStats.getAvailable(), poolStats.getPending());
     }
 }
 

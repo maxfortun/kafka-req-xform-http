@@ -32,10 +32,10 @@ public class JDKHttpClient extends AbstractHttpClient {
 
     private final Duration requestTimeout;
 
-    public JDKHttpClient(HttpProduceRequestDataTransformer httpProduceRequestDataTransformer) {
-        super(httpProduceRequestDataTransformer);
+    public JDKHttpClient(AbstractTransformer transformer) {
+        super(transformer);
 
-        String requestTimeoutString = httpProduceRequestDataTransformer.appConfig("httpClient.socketTimeout");
+        String requestTimeoutString = transformer.appConfig("httpClient.socketTimeout");
         if(null != requestTimeoutString) {
             requestTimeout = Duration.parse(requestTimeoutString);
         } else {

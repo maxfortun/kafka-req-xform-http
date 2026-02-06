@@ -16,36 +16,11 @@
  */
 package org.apache.kafka.common.requests.transform;
 
-import java.io.DataOutputStream;
-import java.io.IOException;
-
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.ResourceBundle;
-import java.util.Set;
 
-import org.apache.kafka.common.errors.InvalidRequestException;
-import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.header.internals.RecordHeader;
-import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.message.OffsetFetchResponseData;
 import org.apache.kafka.common.protocol.types.RawTaggedField;
-import org.apache.kafka.common.record.CompressionType;
-import org.apache.kafka.common.record.DefaultRecord;
-import org.apache.kafka.common.record.MemoryRecords;
-import org.apache.kafka.common.record.MemoryRecordsBuilder;
-import org.apache.kafka.common.record.Record;
-import org.apache.kafka.common.record.RecordBatch;
-import org.apache.kafka.common.record.Records;
-import org.apache.kafka.common.record.SimpleRecord;
-import org.apache.kafka.common.record.TimestampType;
-import org.apache.kafka.common.utils.ByteBufferInputStream;
-import org.apache.kafka.common.utils.ByteBufferOutputStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,8 +28,11 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractOffsetFetchResponseDataTransformer extends AbstractTransformer implements OffsetFetchResponseDataTransformer {
     private static final Logger log = LoggerFactory.getLogger(AbstractOffsetFetchResponseDataTransformer.class);
 
+    protected final String groupIdPattern;
+
     public AbstractOffsetFetchResponseDataTransformer(String transformerName) {
         super(transformerName);
+        groupIdPattern = appConfig("groups.idPattern");
     }
 
     public OffsetFetchResponseData transform(OffsetFetchResponseData offsetFetchResponseDataIn, short version) {
@@ -64,67 +42,84 @@ public abstract class AbstractOffsetFetchResponseDataTransformer extends Abstrac
             log.debug("{}: rawTaggedField {} = {}", transformerName, rawTaggedField.tag(), Utils.utf8(rawTaggedField.data()));
         }
 
-        for (OffsetFetchResponseData.OffsetFetchResponseTopic offsetFetchResponseTopic : offsetFetchResponseDataOut.topics()) {
+        // Handle v8+ format with groups
+        if (!offsetFetchResponseDataOut.groups().isEmpty()) {
+            for (OffsetFetchResponseData.OffsetFetchResponseGroup group : offsetFetchResponseDataOut.groups()) {
+                if (null != groupIdPattern && !group.groupId().matches(groupIdPattern)) {
+                    log.debug("{}: groupIdPattern {} != {}", transformerName, group.groupId(), groupIdPattern);
+                    continue;
+                }
 
-            if(null != topicNamePattern && !offsetFetchResponseTopic.name().matches(topicNamePattern)) {
+                for (OffsetFetchResponseData.OffsetFetchResponseTopics topic : group.topics()) {
+                    if (null != topicNamePattern && !topic.name().matches(topicNamePattern)) {
+                        log.debug("{}: topicNamePattern {} != {}", transformerName, topic.name(), topicNamePattern);
+                        continue;
+                    }
+
+                    for (OffsetFetchResponseData.OffsetFetchResponsePartitions partition : topic.partitions()) {
+                        if (log.isTraceEnabled()) {
+                            log.trace("{}: group={} topic={} partition={} offset={} metadata={} before transform",
+                                transformerName, group.groupId(), topic.name(),
+                                partition.partitionIndex(), partition.committedOffset(), partition.metadata());
+                        }
+
+                        transform(group, topic, partition, version);
+
+                        if (log.isTraceEnabled()) {
+                            log.trace("{}: group={} topic={} partition={} offset={} metadata={} after transform",
+                                transformerName, group.groupId(), topic.name(),
+                                partition.partitionIndex(), partition.committedOffset(), partition.metadata());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Handle legacy format (v0-v7) with topics directly on the response
+        for (OffsetFetchResponseData.OffsetFetchResponseTopic offsetFetchResponseTopic : offsetFetchResponseDataOut.topics()) {
+            if (null != topicNamePattern && !offsetFetchResponseTopic.name().matches(topicNamePattern)) {
                 log.debug("{}: topicNamePattern {} != {}", transformerName, offsetFetchResponseTopic.name(), topicNamePattern);
                 continue;
             }
 
             for (OffsetFetchResponseData.OffsetFetchResponsePartition offsetFetchResponsePartition : offsetFetchResponseTopic.partitions()) {
-
-/*
-                MemoryRecords memoryRecords = (MemoryRecords)offsetFetchResponsePartition.records();
-
-                MemoryRecordsBuilder memoryRecordsBuilder = MemoryRecords.builder(
-                    ByteBuffer.allocate(memoryRecords.sizeInBytes()),
-                    CompressionType.NONE,
-                    TimestampType.CREATE_TIME,
-                    0L
-                );
-
-
-                int batchId = 0;
-                for (RecordBatch recordBatch : memoryRecords.batches()) {
-
-                    int recordId = 0;
-                    for (Record record : recordBatch) {
-
-                        Record transformedRecord = transform(offsetFetchResponseTopic, offsetFetchResponsePartition, recordBatch, record, new RecordHeaders(record.headers()), version);
-                        memoryRecordsBuilder.append(transformedRecord);
-
-                        if(log.isTraceEnabled()) {
-                            log.trace("{}: offsetFetchResponseTopic.offsetFetchResponsePartition.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
-                                transformerName, batchId, recordId, record,
-                                Utils.toString(record.headers()), Utils.utf8(record.key()), Utils.utf8(record.value())
-                            );
-
-                            log.trace("{}: offsetFetchResponseTopic.offsetFetchResponsePartition.recordBatch[{}].record[{}] out:\n{}\n{}  B:{}={}",
-                                transformerName, batchId, recordId, transformedRecord,
-                                Utils.toString(transformedRecord.headers()), Utils.utf8(transformedRecord.key()), Utils.utf8(transformedRecord.value())
-                            );
-                        }
-
-                        recordId++;
-                    }
-
-                    batchId++;
+                if (log.isTraceEnabled()) {
+                    log.trace("{}: topic={} partition={} offset={} metadata={} before transform",
+                        transformerName, offsetFetchResponseTopic.name(),
+                        offsetFetchResponsePartition.partitionIndex(), offsetFetchResponsePartition.committedOffset(),
+                        offsetFetchResponsePartition.metadata());
                 }
 
-                offsetFetchResponsePartition.setRecords(memoryRecordsBuilder.build());
-*/
+                transform(offsetFetchResponseTopic, offsetFetchResponsePartition, version);
+
+                if (log.isTraceEnabled()) {
+                    log.trace("{}: topic={} partition={} offset={} metadata={} after transform",
+                        transformerName, offsetFetchResponseTopic.name(),
+                        offsetFetchResponsePartition.partitionIndex(), offsetFetchResponsePartition.committedOffset(),
+                        offsetFetchResponsePartition.metadata());
+                }
             }
         }
 
         return offsetFetchResponseDataOut;
     }
 
-    protected abstract Record transform(
-        OffsetFetchResponseData.OffsetFetchResponseTopic offsetFetchResponseTopic,
-        OffsetFetchResponseData.OffsetFetchResponsePartition offsetFetchResponsePartition,
-        RecordBatch recordBatch,
-        Record record,
-        RecordHeaders recordHeaders,
+    /**
+     * Transform a partition's offset data for v8+ format (with group context).
+     */
+    protected abstract void transform(
+        OffsetFetchResponseData.OffsetFetchResponseGroup group,
+        OffsetFetchResponseData.OffsetFetchResponseTopics topic,
+        OffsetFetchResponseData.OffsetFetchResponsePartitions partition,
+        short version
+    );
+
+    /**
+     * Transform a partition's offset data for legacy format (v0-v7).
+     */
+    protected abstract void transform(
+        OffsetFetchResponseData.OffsetFetchResponseTopic topic,
+        OffsetFetchResponseData.OffsetFetchResponsePartition partition,
         short version
     );
 }
