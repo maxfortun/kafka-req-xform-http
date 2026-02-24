@@ -118,6 +118,9 @@ The `AHC5HttpClient` (Apache HttpClient 5) provides configurable connection pool
 | `httpClient.socketTimeout` | Infinite | seconds | Socket timeout for connection-level operations |
 | `httpClient.connectTimeout` | Infinite | seconds | Timeout for establishing a new connection |
 | `httpClient.connTimeToLiveInMinutes` | 10 | minutes | Maximum time a connection can be kept alive in the pool |
+| `httpClient.connValidateAfterInactivityInSeconds` | 5 | seconds | Validate connections after this inactivity period before reuse |
+| `httpClient.connEvictIdleConnectionsInMinutes` | 10 | minutes | Background eviction of idle connections (runs periodically) |
+| `httpClient.closeIdleConnectionsInSeconds` | 30 | seconds | Close idle connections older than this at startup |
 | `httpClient.maxConnPerRoute` | 200 | integer | Maximum connections per route (host) |
 | `httpClient.maxConnTotal` | 1000 | integer | Maximum total connections in the pool |
 
@@ -128,6 +131,7 @@ The AHC5 client uses a pooling connection manager with:
 - **SO_KEEPALIVE**: Enabled (detects dead connections)
 - **Pool Concurrency Policy**: LAX (allows concurrent access)
 - **Pool Reuse Policy**: LIFO (reuses most recently used connections)
+- **Background Eviction**: Automatically evicts idle and expired connections
 
 ### Sample AHC5 Configuration
 
@@ -142,6 +146,9 @@ httpClient.connectTimeout=10
 
 # Connection pool
 httpClient.connTimeToLiveInMinutes=5
+httpClient.connValidateAfterInactivityInSeconds=5
+httpClient.connEvictIdleConnectionsInMinutes=10
+httpClient.closeIdleConnectionsInSeconds=30
 httpClient.maxConnPerRoute=100
 httpClient.maxConnTotal=500
 

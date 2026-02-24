@@ -63,6 +63,7 @@ public class AHC5HttpClient extends AbstractHttpClient {
                 ConnectionConfig.custom()
                 .setSocketTimeout(appTimeout("socketTimeout"))
                 .setConnectTimeout(appTimeout("connectTimeout"))
+                .setValidateAfterInactivity(TimeValue.ofSeconds(appInt("connValidateAfterInactivityInSeconds", 5)))
                 .setTimeToLive(TimeValue.ofMinutes(appInt("connTimeToLiveInMinutes", 10)))
                 .build()
             )
@@ -70,10 +71,14 @@ public class AHC5HttpClient extends AbstractHttpClient {
             .setMaxConnTotal(appInt("maxConnTotal", 1000))
             .build();
 
+        connectionManager.closeIdle(TimeValue.ofSeconds(appInt("closeIdleConnectionsInSeconds", 30)));
+
         poolStats = connectionManager.getTotalStats();
 
         httpClient = HttpClients.custom()
             .setConnectionManager(connectionManager)
+            .evictIdleConnections(TimeValue.ofMinutes(appInt("connEvictIdleConnectionsInMinutes", 10)))
+            .evictExpiredConnections()
             .build();
 
     }
