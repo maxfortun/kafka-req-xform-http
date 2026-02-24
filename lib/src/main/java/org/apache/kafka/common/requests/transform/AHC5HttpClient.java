@@ -63,11 +63,11 @@ public class AHC5HttpClient extends AbstractHttpClient {
                 ConnectionConfig.custom()
                 .setSocketTimeout(appTimeout("socketTimeout"))
                 .setConnectTimeout(appTimeout("connectTimeout"))
-                .setTimeToLive(TimeValue.ofMinutes(10))
+                .setTimeToLive(TimeValue.ofMinutes(appInt("connTimeToLiveInMinutes", 10)))
                 .build()
             )
-            .setMaxConnPerRoute(25)
-            .setMaxConnTotal(500)
+            .setMaxConnPerRoute(appInt("maxConnPerRoute",200))
+            .setMaxConnTotal(appInt("maxConnTotal", 1000))
             .build();
 
         poolStats = connectionManager.getTotalStats();
@@ -78,14 +78,25 @@ public class AHC5HttpClient extends AbstractHttpClient {
 
     }
 
+    private Integer appInt(String key, Integer defaultValue) {
+        String stringValue = transformer.appConfig("httpClient."+key);
+        if(null == stringValue || stringValue.isEmpty()) {
+            return defaultValue;
+        }
+
+        Integer value = Integer.parseInt(stringValue);
+        log.debug("{}: {}={}", transformer.transformerName, key, value);
+        return value;
+    }
+
     private Timeout appTimeout(String key) {
-        String string = transformer.appConfig("httpClient."+key);
-        if(null == string || string.isEmpty()) {
+        String stringValue = transformer.appConfig("httpClient."+key);
+        if(null == stringValue || stringValue.isEmpty()) {
             return Timeout.INFINITE;
         }
-        Timeout timeout = Timeout.ofSeconds(Long.parseLong(string));
-        log.debug("{}: {}={}", transformer.transformerName, key, timeout);
-        return timeout;
+        Timeout value = Timeout.ofSeconds(Long.parseLong(stringValue));
+        log.debug("{}: {}={}", transformer.transformerName, key, value);
+        return value;
     }
 
     public AbstractHttpRequest newHttpRequest(String uri) throws Exception {
