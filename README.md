@@ -106,6 +106,58 @@ map-topic.scopes=(?i)^(app)$
 
 ---
 
+## AHC5 HTTP Client Configuration
+
+The `AHC5HttpClient` (Apache HttpClient 5) provides configurable connection pooling and timeout settings. All parameters use the `httpClient.` prefix.
+
+### Connection Parameters
+
+| Name | Default | Type | Description |
+|------|---------|------|-------------|
+| `httpClient.soTimeout` | Infinite | seconds | Socket SO_TIMEOUT - max time waiting for data on an established connection |
+| `httpClient.socketTimeout` | Infinite | seconds | Socket timeout for connection-level operations |
+| `httpClient.connectTimeout` | Infinite | seconds | Timeout for establishing a new connection |
+| `httpClient.connTimeToLiveInMinutes` | 10 | minutes | Maximum time a connection can be kept alive in the pool |
+| `httpClient.maxConnPerRoute` | 200 | integer | Maximum connections per route (host) |
+| `httpClient.maxConnTotal` | 1000 | integer | Maximum total connections in the pool |
+
+### Connection Pool Settings
+
+The AHC5 client uses a pooling connection manager with:
+- **TCP_NODELAY**: Enabled (reduces latency)
+- **SO_KEEPALIVE**: Enabled (detects dead connections)
+- **Pool Concurrency Policy**: LAX (allows concurrent access)
+- **Pool Reuse Policy**: LIFO (reuses most recently used connections)
+
+### Sample AHC5 Configuration
+
+```properties
+# HTTP client class
+httpClient.class=org.apache.kafka.common.requests.transform.AHC5HttpClient
+
+# Timeouts (in seconds)
+httpClient.soTimeout=60
+httpClient.socketTimeout=30
+httpClient.connectTimeout=10
+
+# Connection pool
+httpClient.connTimeToLiveInMinutes=5
+httpClient.maxConnPerRoute=100
+httpClient.maxConnTotal=500
+
+# Error handling
+httpClient.onException=fail
+```
+
+### Pool Statistics Logging
+
+When INFO logging is enabled, the client logs connection pool statistics when the pending connection count changes:
+```
+connections: { max: 1000, leased: 5, avail: 10, pending: 2 }
+```
+
+---
+
 ## HttpOffsetFetchResponseDataTransformer
 
 Intercepts OffsetFetch responses and makes HTTP requests for each partition's offset data. This allows external services to be notified of consumer group offset fetches and optionally modify the returned offset data.
