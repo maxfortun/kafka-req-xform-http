@@ -18,11 +18,15 @@ package org.apache.kafka.common.requests.transform;
 
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.DnsResolver;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 import org.apache.hc.core5.http.io.entity.ByteBufferEntity;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
@@ -67,6 +71,19 @@ public class AHC5HttpClient extends AbstractHttpClient {
                 .setTimeToLive(TimeValue.ofMinutes(appInt("connTimeToLiveInMinutes", 10)))
                 .build()
             )
+            .setDnsResolver(new DnsResolver() {
+                @Override
+                public InetAddress[] resolve(String host) throws UnknownHostException {
+                    // Bypass DNS cache by forcing fresh resolution each time
+                    log.debug("{}: Resolving DNS for host: {}", transformer.transformerName, host);
+                    return InetAddress.getAllByName(host);
+                }
+
+                @Override
+                public String resolveCanonicalHostname(String host) throws UnknownHostException {
+                    return InetAddress.getByName(host).getCanonicalHostName();
+                }
+            })
             .setMaxConnPerRoute(appInt("maxConnPerRoute",200))
             .setMaxConnTotal(appInt("maxConnTotal", 1000))
             .build();
