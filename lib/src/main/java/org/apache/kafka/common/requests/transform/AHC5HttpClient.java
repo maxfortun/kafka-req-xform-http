@@ -18,12 +18,19 @@ package org.apache.kafka.common.requests.transform;
 
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.ConnectionKeepAliveStrategy;
 import org.apache.hc.client5.http.DnsResolver;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.DefaultConnectionKeepAliveStrategy;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+
+import org.apache.hc.core5.http.HeaderElements;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.protocol.HttpContext;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -92,8 +99,24 @@ public class AHC5HttpClient extends AbstractHttpClient {
 
         poolStats = connectionManager.getTotalStats();
 
+        final TimeValue defaultKeepAlive = TimeValue.ofSeconds(appInt("keepAliveTimeoutInSeconds", 30));
+
         httpClient = HttpClients.custom()
             .setConnectionManager(connectionManager)
+            .setKeepAliveStrategy(new ConnectionKeepAliveStrategy() {
+                @Override
+                public TimeValue getKeepAliveDuration(org.apache.hc.core5.http.HttpResponse response, HttpContext context) {
+                    // First try to use server's Keep-Alive timeout
+                    TimeValue duration = DefaultConnectionKeepAliveStrategy.INSTANCE.getKeepAliveDuration(response, context);
+                    if (duration != null && duration.toMilliseconds() > 0) {
+                        log.debug("{}: Using server Keep-Alive timeout: {}", transformer.transformerName, duration);
+                        return duration;
+                    }
+                    // Otherwise use configured default
+                    log.debug("{}: Using default Keep-Alive timeout: {}", transformer.transformerName, defaultKeepAlive);
+                    return defaultKeepAlive;
+                }
+            })
             .evictIdleConnections(TimeValue.ofMinutes(appInt("connEvictIdleConnectionsInMinutes", 10)))
             .evictExpiredConnections()
             .build();
