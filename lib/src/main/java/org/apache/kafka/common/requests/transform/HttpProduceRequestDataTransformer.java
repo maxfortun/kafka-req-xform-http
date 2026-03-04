@@ -102,8 +102,10 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                     addErrorHeaders(recordHeaders, e);
                     String dlqTopic = reqConfig(recordHeaders, "onException.dlqTopic");
                     if (dlqTopic == null || dlqTopic.isEmpty()) {
-                        dlqTopic = topicProduceData.name() + "-dlq";
+                        dlqTopic = "__{topic-name}-dlq";
                     }
+					dlqTopic = dlqTopic.replaceAll("{topic-name}", topicProduceData.name());
+
                     recordHeaders.remove(headerPrefix + "dlq-topic");
                     recordHeaders.add(headerPrefix + "dlq-topic", dlqTopic.getBytes(StandardCharsets.UTF_8));
                     recordHeaders.remove(headerPrefix + "original-topic");
