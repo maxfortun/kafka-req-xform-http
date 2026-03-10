@@ -114,6 +114,7 @@ The `AHC5HttpClient` (Apache HttpClient 5) provides configurable connection pool
 
 | Name | Default | Type | Description |
 |------|---------|------|-------------|
+| `httpClient.responseTimeout` | Infinite | seconds | Total timeout for entire HTTP request/response cycle |
 | `httpClient.soTimeout` | Infinite | seconds | Socket SO_TIMEOUT - max time waiting for data on an established connection |
 | `httpClient.socketTimeout` | Infinite | seconds | Socket timeout for connection-level operations |
 | `httpClient.connectTimeout` | Infinite | seconds | Timeout for establishing a new connection |
@@ -140,6 +141,7 @@ The AHC5 client uses a pooling connection manager with:
 httpClient.class=org.apache.kafka.common.requests.transform.AHC5HttpClient
 
 # Timeouts (in seconds)
+httpClient.responseTimeout=10
 httpClient.soTimeout=60
 httpClient.socketTimeout=30
 httpClient.connectTimeout=10

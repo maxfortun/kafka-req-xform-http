@@ -103,6 +103,11 @@ public class AHC5HttpClient extends AbstractHttpClient {
 
         httpClient = HttpClients.custom()
             .setConnectionManager(connectionManager)
+            .setDefaultRequestConfig(
+                RequestConfig.custom()
+                .setResponseTimeout(appTimeout("responseTimeout"))
+                .build()
+            )
             .setKeepAliveStrategy(new ConnectionKeepAliveStrategy() {
                 @Override
                 public TimeValue getKeepAliveDuration(org.apache.hc.core5.http.HttpResponse response, HttpContext context) {
