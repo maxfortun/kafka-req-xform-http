@@ -143,6 +143,11 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         short version
     ) throws Exception {
 
+        String recordKey = null;
+        if(null != record.key()) {
+            recordKey = Utils.utf8(record.key());
+		}
+
         if(configured(recordHeaders, "enable", "false")) {
             Header[] headers = Arrays.stream(recordHeaders.toArray())
                 .filter( header -> {
@@ -161,7 +166,8 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             return newRecord(recordBatch, record, headers, record.value());
         }
 
-        log.info("{}: start", transformerName);
+
+        log.info("{}: start {} {}", transformerName, topicProduceData.name(), recordKey);
 
         Date inDate = new Date();
 
@@ -219,9 +225,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             }
         }
 
-        String recordKey = null;
-        if(null != record.key()) {
-            recordKey = Utils.utf8(record.key());
+        if(null != recordKey) {
             httpRequest.header("kafka.KEY", recordKey);
         }
         httpRequest.body(recordKey, record.value());
@@ -311,7 +315,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         log.trace("{}: res body {}", transformerName, body.length, body);
         log.trace("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
 
-        log.info("{}: end {} {}", transformerName, recordKey, runTime);
+        log.info("{}: end {} {} {}", transformerName, topicProduceData.name(), recordKey, runTime);
 
         return newRecord(recordBatch, record, headers, body);
     }
