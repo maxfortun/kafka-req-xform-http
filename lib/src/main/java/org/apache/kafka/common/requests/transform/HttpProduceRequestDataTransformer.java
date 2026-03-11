@@ -166,8 +166,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             return newRecord(recordBatch, record, headers, record.value());
         }
 
-
-        log.info("{}: start {} {}", transformerName, topicProduceData.name(), recordKey);
+        log.info("{}: start {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), recordKey);
 
         Date inDate = new Date();
 
@@ -315,7 +314,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         log.trace("{}: res body {}", transformerName, body.length, body);
         log.trace("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
 
-        log.info("{}: end {} {} {}", transformerName, topicProduceData.name(), recordKey, runTime);
+        log.info("{}: end {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), recordKey, runTime);
 
         return newRecord(recordBatch, record, headers, body);
     }
