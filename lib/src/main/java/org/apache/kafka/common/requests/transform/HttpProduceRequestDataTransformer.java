@@ -66,8 +66,13 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         RecordHeaders recordHeaders,
         short version
     ) {
+
+        Date inDate = new Date();
+
         try {
-            return transformImpl(
+        	log.info("{}: start {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), Utils.utf8(record.key()));
+
+            Record transformed = transformImpl(
                 topicProduceData,
                 partitionProduceData,
                 recordBatch,
@@ -75,8 +80,16 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 recordHeaders,
                 version
             );
+
+        	Date outDate = new Date();
+        	long runTime = outDate.getTime() - inDate.getTime();
+        	log.info("{}: ok {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), Utils.utf8(record.key()), runTime);
+
+			return transformed;
         } catch(Exception e) {
-            log.warn("{}: transform failed", transformerName, e);
+        	Date outDate = new Date();
+        	long runTime = outDate.getTime() - inDate.getTime();
+        	log.warn("{}: error {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), Utils.utf8(record.key()), runTime, e);
 
             String onException = reqConfig(recordHeaders, "onException");
 
@@ -143,11 +156,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         short version
     ) throws Exception {
 
-        String recordKey = null;
-        if(null != record.key()) {
-            recordKey = Utils.utf8(record.key());
-		}
-
         if(configured(recordHeaders, "enable", "false")) {
             Header[] headers = Arrays.stream(recordHeaders.toArray())
                 .filter( header -> {
@@ -165,8 +173,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
                 .toArray(Header[]::new);
             return newRecord(recordBatch, record, headers, record.value());
         }
-
-        log.info("{}: start {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), recordKey);
 
         Date inDate = new Date();
 
@@ -224,6 +230,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
             }
         }
 
+        String recordKey = Utils.utf8(record.key());
         if(null != recordKey) {
             httpRequest.header("kafka.KEY", recordKey);
         }
@@ -313,8 +320,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
         log.trace("{}: res body {}", transformerName, body.length, body);
         log.trace("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
-
-        log.info("{}: end {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), recordKey, runTime);
 
         return newRecord(recordBatch, record, headers, body);
     }
