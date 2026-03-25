@@ -70,7 +70,8 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
         Date inDate = new Date();
 
         try {
-        	log.info("{}: start {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), Utils.utf8(record.key()));
+			// log this to track started threads that hang
+        	log.debug("{}: start {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), Utils.utf8(record.key()));
 
             Record transformed = transformImpl(
                 topicProduceData,
