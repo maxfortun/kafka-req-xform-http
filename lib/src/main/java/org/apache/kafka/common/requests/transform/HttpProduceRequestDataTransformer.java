@@ -6,7 +6,7 @@
  * (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *	http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,287 +42,310 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDataTransformer {
-    private static final Logger log = LoggerFactory.getLogger(HttpProduceRequestDataTransformer.class);
+	private static final Logger log = LoggerFactory.getLogger(HttpProduceRequestDataTransformer.class);
 
-    private static final String brokerHostname = System.getenv("HOSTNAME");
+	private static final String brokerHostname = System.getenv("HOSTNAME");
 
-    private final String headerPrefixPattern;
-    private final String persistentHeadersPattern;
-    private final String envHeadersPattern;
+	private final String headerPrefixPattern;
+	private final String persistentHeadersPattern;
+	private final String envHeadersPattern;
+	private final String keyHeaderName;
 
-    public HttpProduceRequestDataTransformer(String transformerName) throws Exception {
-        super(transformerName);
+	public HttpProduceRequestDataTransformer(String transformerName) throws Exception {
+		super(transformerName);
 
-        headerPrefixPattern = "(?i)^"+headerPrefix+".*$";
-        persistentHeadersPattern = appConfig("headers.persistentPattern");
-        envHeadersPattern = appConfig("headers.envPattern");
-    }
+		headerPrefixPattern = "(?i)^"+headerPrefix+".*$";
+		persistentHeadersPattern = appConfig("headers.persistentPattern");
+		envHeadersPattern = appConfig("headers.envPattern");
+		keyHeaderName = appConfig("headers.key");
+	}
 
-    protected Record transform(
-        ProduceRequestData.TopicProduceData topicProduceData,
-        ProduceRequestData.PartitionProduceData partitionProduceData,
-        RecordBatch recordBatch,
-        Record record,
-        RecordHeaders recordHeaders,
-        short version
-    ) {
+	protected Record transform(
+		ProduceRequestData.TopicProduceData topicProduceData,
+		ProduceRequestData.PartitionProduceData partitionProduceData,
+		RecordBatch recordBatch,
+		Record record,
+		RecordHeaders recordHeaders,
+		short version
+	) {
 
-        Date inDate = new Date();
+		Date inDate = new Date();
 
-        try {
+		String key = keyFromRecord(record, recordHeaders);
+		try {
 			// log this to track started threads that hang
-        	log.debug("{}: start {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), Utils.utf8(record.key()));
+			log.debug("{}: start {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), key);
 
-            Record transformed = transformImpl(
-                topicProduceData,
-                partitionProduceData,
-                recordBatch,
-                record,
-                recordHeaders,
-                version
-            );
+			Record transformed = transformImpl(
+				topicProduceData,
+				partitionProduceData,
+				recordBatch,
+				record,
+				recordHeaders,
+				version
+			);
 
-        	Date outDate = new Date();
-        	long runTime = outDate.getTime() - inDate.getTime();
-        	log.info("{}: ok {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), Utils.utf8(record.key()), runTime);
+			Date outDate = new Date();
+			long runTime = outDate.getTime() - inDate.getTime();
+
+			log.info("{}: ok {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), key, runTime);
 
 			return transformed;
-        } catch(Exception e) {
-        	Date outDate = new Date();
-        	long runTime = outDate.getTime() - inDate.getTime();
-        	log.warn("{}: error {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), Utils.utf8(record.key()), runTime, e);
+		} catch(Exception e) {
+			Date outDate = new Date();
+			long runTime = outDate.getTime() - inDate.getTime();
+			log.warn("{}: error {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), key, runTime, e);
 
-            String onException = reqConfig(recordHeaders, "onException");
+			String onException = reqConfig(recordHeaders, "onException");
 
-            if ("original".equalsIgnoreCase(onException)) {
-                log.debug("{}: onException=original, returning original record", transformerName);
-                return record;
-            }
+			if ("original".equalsIgnoreCase(onException)) {
+				log.debug("{}: onException=original, returning original record", transformerName);
+				return record;
+			}
 
-            if ("headers".equalsIgnoreCase(onException)) {
-                log.debug("{}: onException=headers, returning record with error headers", transformerName);
-                try {
-                    addErrorHeaders(recordHeaders, e);
-                    return newRecord(recordBatch, record, recordHeaders.toArray(), record.value());
-                } catch (Exception innerEx) {
-                    log.error("{}: failed to create error record", transformerName, innerEx);
-                    throw new InvalidRequestException(transformerName, e);
-                }
-            }
+			if ("headers".equalsIgnoreCase(onException)) {
+				log.debug("{}: onException=headers, returning record with error headers", transformerName);
+				try {
+					addErrorHeaders(recordHeaders, e);
+					return newRecord(recordBatch, record, recordHeaders.toArray(), record.value());
+				} catch (Exception innerEx) {
+					log.error("{}: failed to create error record", transformerName, innerEx);
+					throw new InvalidRequestException(transformerName, e);
+				}
+			}
 
-            if ("dlq".equalsIgnoreCase(onException)) {
-                log.debug("{}: onException=dlq, routing record to dead-letter queue", transformerName);
-                try {
-                    addErrorHeaders(recordHeaders, e);
-                    String dlqTopic = reqConfig(recordHeaders, "onException.dlqTopic");
-                    if (dlqTopic == null || dlqTopic.isEmpty()) {
-                        dlqTopic = "__{topic-name}-dlq";
-                    }
+			if ("dlq".equalsIgnoreCase(onException)) {
+				log.debug("{}: onException=dlq, routing record to dead-letter queue", transformerName);
+				try {
+					addErrorHeaders(recordHeaders, e);
+					String dlqTopic = reqConfig(recordHeaders, "onException.dlqTopic");
+					if (dlqTopic == null || dlqTopic.isEmpty()) {
+						dlqTopic = "__{topic-name}-dlq";
+					}
 					dlqTopic = dlqTopic.replaceAll("{topic-name}", topicProduceData.name());
 
-                    recordHeaders.remove(headerPrefix + "dlq-topic");
-                    recordHeaders.add(headerPrefix + "dlq-topic", dlqTopic.getBytes(StandardCharsets.UTF_8));
-                    recordHeaders.remove(headerPrefix + "original-topic");
-                    recordHeaders.add(headerPrefix + "original-topic", topicProduceData.name().getBytes(StandardCharsets.UTF_8));
-                    log.debug("{}: record will be routed to DLQ topic: {}", transformerName, dlqTopic);
-                    return newRecord(recordBatch, record, recordHeaders.toArray(), record.value());
-                } catch (Exception innerEx) {
-                    log.error("{}: failed to create DLQ record", transformerName, innerEx);
-                    throw new InvalidRequestException(transformerName, e);
-                }
-            }
+					recordHeaders.remove(headerPrefix + "dlq-topic");
+					recordHeaders.add(headerPrefix + "dlq-topic", dlqTopic.getBytes(StandardCharsets.UTF_8));
+					recordHeaders.remove(headerPrefix + "original-topic");
+					recordHeaders.add(headerPrefix + "original-topic", topicProduceData.name().getBytes(StandardCharsets.UTF_8));
+					log.debug("{}: record will be routed to DLQ topic: {}", transformerName, dlqTopic);
+					return newRecord(recordBatch, record, recordHeaders.toArray(), record.value());
+				} catch (Exception innerEx) {
+					log.error("{}: failed to create DLQ record", transformerName, innerEx);
+					throw new InvalidRequestException(transformerName, e);
+				}
+			}
 
-            // Default behavior: throw
-            throw new InvalidRequestException(transformerName, e);
-        }
-    }
+			// Default behavior: throw
+			throw new InvalidRequestException(transformerName, e);
+		}
+	}
 
-    private void addErrorHeaders(RecordHeaders recordHeaders, Exception e) {
-        recordHeaders.remove(headerPrefix + "error");
-        recordHeaders.remove(headerPrefix + "error-class");
-        recordHeaders.remove(headerPrefix + "error-message");
-        recordHeaders.add(headerPrefix + "error", "true".getBytes(StandardCharsets.UTF_8));
-        recordHeaders.add(headerPrefix + "error-class", e.getClass().getName().getBytes(StandardCharsets.UTF_8));
-        if (e.getMessage() != null) {
-            recordHeaders.add(headerPrefix + "error-message", e.getMessage().getBytes(StandardCharsets.UTF_8));
-        }
-    }
+	private String keyFromRecord(Record record, RecordHeaders recordHeaders) {
+		String key = Utils.utf8(record.key());
+		if(null != key) {
+			return "k:"+key;
+		}
 
-    protected Record transformImpl(
-        ProduceRequestData.TopicProduceData topicProduceData,
-        ProduceRequestData.PartitionProduceData partitionProduceData,
-        RecordBatch recordBatch,
-        Record record,
-        RecordHeaders recordHeaders,
-        short version
-    ) throws Exception {
+		if(null != keyHeaderName) {
+			Header header = recordHeaders.lastHeader(keyHeaderName);
+			if(null != header) {
+				key = Utils.utf8(header.value());
+				if(null != key && !key.isEmpty()) {
+					return "h:"+keyHeaderName+":"+key;
+				}
+			}
+		}
 
-        if(configured(recordHeaders, "enable", "false")) {
-            Header[] headers = Arrays.stream(recordHeaders.toArray())
-                .filter( header -> {
-                    String key = header.key();
-                    String value = Utils.utf8(header.value());
+		return key;
+	}
 
-                    if(key.matches(headerPrefixPattern)) {
-                        log.debug("{}: request header {}={} not added to request, matches headerPrefixPattern {}", transformerName, key, value, headerPrefixPattern);
-                        return false;
-                    }
+	private void addErrorHeaders(RecordHeaders recordHeaders, Exception e) {
+		recordHeaders.remove(headerPrefix + "error");
+		recordHeaders.remove(headerPrefix + "error-class");
+		recordHeaders.remove(headerPrefix + "error-message");
+		recordHeaders.add(headerPrefix + "error", "true".getBytes(StandardCharsets.UTF_8));
+		recordHeaders.add(headerPrefix + "error-class", e.getClass().getName().getBytes(StandardCharsets.UTF_8));
+		if (e.getMessage() != null) {
+			recordHeaders.add(headerPrefix + "error-message", e.getMessage().getBytes(StandardCharsets.UTF_8));
+		}
+	}
 
-                    log.debug("{}: request header {}={} added to request, doesn't match headerPrefixPattern {}", transformerName, key, value, headerPrefixPattern);
-                    return true;
-                } )
-                .toArray(Header[]::new);
-            return newRecord(recordBatch, record, headers, record.value());
-        }
+	protected Record transformImpl(
+		ProduceRequestData.TopicProduceData topicProduceData,
+		ProduceRequestData.PartitionProduceData partitionProduceData,
+		RecordBatch recordBatch,
+		Record record,
+		RecordHeaders recordHeaders,
+		short version
+	) throws Exception {
 
-        Date inDate = new Date();
+		if(configured(recordHeaders, "enable", "false")) {
+			Header[] headers = Arrays.stream(recordHeaders.toArray())
+				.filter( header -> {
+					String key = header.key();
+					String value = Utils.utf8(header.value());
 
-        AbstractHttpClient httpClient = HttpClients.getHttpClient(recordHeaders, this);
-        AbstractHttpRequest httpRequest = httpClient.newHttpRequest(reqConfig(recordHeaders, "uri"));
+					if(key.matches(headerPrefixPattern)) {
+						log.debug("{}: request header {}={} not added to request, matches headerPrefixPattern {}", transformerName, key, value, headerPrefixPattern);
+						return false;
+					}
 
-        Map<String, List<String>> resHeadersMap = new HashMap<>();
-        Map<String, List<String>> origHeadersMap = new HashMap<>();
+					log.debug("{}: request header {}={} added to request, doesn't match headerPrefixPattern {}", transformerName, key, value, headerPrefixPattern);
+					return true;
+				} )
+				.toArray(Header[]::new);
+			return newRecord(recordBatch, record, headers, record.value());
+		}
 
-        for(Header header : record.headers()) {
-            String key = header.key();
-            String value = Utils.utf8(header.value());
+		Date inDate = new Date();
 
-            if(key.matches(headerPrefixPattern)) {
-                log.debug("{}: request header {}={} not added to request, matches headerPrefixPattern {}", transformerName, key, value, headerPrefixPattern);
-                continue;
-            }
+		AbstractHttpClient httpClient = HttpClients.getHttpClient(recordHeaders, this);
+		AbstractHttpRequest httpRequest = httpClient.newHttpRequest(reqConfig(recordHeaders, "uri"));
 
-            if(null == persistentHeadersPattern || key.matches(persistentHeadersPattern)) {
-                try {
-                    origHeadersMap.put(key, Arrays.asList(value));
-                    httpRequest.header(key, value);
-                    log.debug("{}: persistent header {}={} added to request, matches headers.persistentPattern {}", transformerName, key, value, persistentHeadersPattern);
-                } catch(java.lang.IllegalArgumentException e) {
-                    log.debug("{}: persistent header {}={} not added to request", transformerName, key, value, e);
-                }
-            } else {
-                log.debug("{}: persistent header {}={} not added to request, doesn't match pattern headers.persistentPattern {}", transformerName, key, value, persistentHeadersPattern);
-            }
+		Map<String, List<String>> resHeadersMap = new HashMap<>();
+		Map<String, List<String>> origHeadersMap = new HashMap<>();
 
-            String transientHeadersPattern = reqConfig(recordHeaders, "headers.transientPattern");
-            if(null != transientHeadersPattern && key.matches(transientHeadersPattern)) {
-                resHeadersMap.put(key, Arrays.asList(value));
-                log.debug("{}: transient header {}={} added to response, matches headers.transientPattern {}", transformerName, key, value, transientHeadersPattern);
-            } else {
-                log.debug("{}: transient header {}={} not added to response, doesn't match headers.transientPattern {}", transformerName, key, value, transientHeadersPattern);
-            }
-        }
+		for(Header header : record.headers()) {
+			String key = header.key();
+			String value = Utils.utf8(header.value());
 
-        httpRequest.header(headerPrefix+"hostname", brokerHostname);
-        httpRequest.header(headerPrefix+"topic-name", topicProduceData.name());
-        httpRequest.header(headerPrefix+"partition-index", String.valueOf(partitionProduceData.index()));
-        httpRequest.header(headerPrefix+"record-offset", String.valueOf(record.offset()));
+			if(key.matches(headerPrefixPattern)) {
+				log.debug("{}: request header {}={} not added to request, matches headerPrefixPattern {}", transformerName, key, value, headerPrefixPattern);
+				continue;
+			}
 
-        String httpHeadersString = reqConfig(recordHeaders, "headers.http");
-        if(null != httpHeadersString) {
-            String[] httpHeadersStrings = httpHeadersString.split("[,\\s]+");
-            for(String httpHeaderString : httpHeadersStrings) {
-                try {
-                    String[] tokens = httpHeaderString.split("\\s*=\\s*");
-                    httpRequest.header(tokens[0], tokens[1]);
-                } catch(Exception e) {
-                    log.warn("{}", httpHeaderString, e);
-                }
-            }
-        }
+			if(null == persistentHeadersPattern || key.matches(persistentHeadersPattern)) {
+				try {
+					origHeadersMap.put(key, Arrays.asList(value));
+					httpRequest.header(key, value);
+					log.debug("{}: persistent header {}={} added to request, matches headers.persistentPattern {}", transformerName, key, value, persistentHeadersPattern);
+				} catch(java.lang.IllegalArgumentException e) {
+					log.debug("{}: persistent header {}={} not added to request", transformerName, key, value, e);
+				}
+			} else {
+				log.debug("{}: persistent header {}={} not added to request, doesn't match pattern headers.persistentPattern {}", transformerName, key, value, persistentHeadersPattern);
+			}
 
-        String recordKey = Utils.utf8(record.key());
-        if(null != recordKey) {
-            httpRequest.header("kafka.KEY", recordKey);
-        }
-        httpRequest.body(recordKey, record.value());
+			String transientHeadersPattern = reqConfig(recordHeaders, "headers.transientPattern");
+			if(null != transientHeadersPattern && key.matches(transientHeadersPattern)) {
+				resHeadersMap.put(key, Arrays.asList(value));
+				log.debug("{}: transient header {}={} added to response, matches headers.transientPattern {}", transformerName, key, value, transientHeadersPattern);
+			} else {
+				log.debug("{}: transient header {}={} not added to response, doesn't match headers.transientPattern {}", transformerName, key, value, transientHeadersPattern);
+			}
+		}
 
-        Date reqDate = new Date();
-        httpRequest.header(headerPrefix+"req-time", ""+reqDate.getTime());
+		httpRequest.header(headerPrefix+"hostname", brokerHostname);
+		httpRequest.header(headerPrefix+"topic-name", topicProduceData.name());
+		httpRequest.header(headerPrefix+"partition-index", String.valueOf(partitionProduceData.index()));
+		httpRequest.header(headerPrefix+"record-offset", String.valueOf(record.offset()));
 
-        byte[] body = new byte[0];
+		String httpHeadersString = reqConfig(recordHeaders, "headers.http");
+		if(null != httpHeadersString) {
+			String[] httpHeadersStrings = httpHeadersString.split("[,\\s]+");
+			for(String httpHeaderString : httpHeadersStrings) {
+				try {
+					String[] tokens = httpHeaderString.split("\\s*=\\s*");
+					httpRequest.header(tokens[0], tokens[1]);
+				} catch(Exception e) {
+					log.warn("{}", httpHeaderString, e);
+				}
+			}
+		}
 
-        if(configured(recordHeaders, "enable-send", "true", true)) {
-            HttpResponse httpResponse = httpClient.send(httpRequest);
-            log.debug("{}: httpResponse {}", transformerName, httpResponse);
-            if(httpResponse.statusCode() != 200) {
-                String headersString = httpResponse.headers().entrySet().stream()
-                    .map(entry -> entry.getKey() + ": " + String.join(", ", entry.getValue()))
-                    .collect(Collectors.joining("\n"));
+		String recordKey = Utils.utf8(record.key());
+		if(null != recordKey) {
+			httpRequest.header("kafka.KEY", recordKey);
+		}
+		httpRequest.body(recordKey, record.value());
 
-                log.warn("{}: httpResponse {}\n{}\n{}", transformerName, httpResponse, headersString, new String(httpResponse.body()));
+		Date reqDate = new Date();
+		httpRequest.header(headerPrefix+"req-time", ""+reqDate.getTime());
 
-                String onHttpException = reqConfig(recordHeaders, "httpClient.onException");
+		byte[] body = new byte[0];
 
-                if("original".equalsIgnoreCase(onHttpException)) {
-                    return record;
-                }
+		if(configured(recordHeaders, "enable-send", "true", true)) {
+			HttpResponse httpResponse = httpClient.send(httpRequest);
+			log.debug("{}: httpResponse {}", transformerName, httpResponse);
+			if(httpResponse.statusCode() != 200) {
+				String headersString = httpResponse.headers().entrySet().stream()
+					.map(entry -> entry.getKey() + ": " + String.join(", ", entry.getValue()))
+					.collect(Collectors.joining("\n"));
 
-                if(!"pass-thru".equalsIgnoreCase(onHttpException)) {
-                    throw new HttpResponseException(httpResponse);
-                }
-            }
+				log.warn("{}: httpResponse {}\n{}\n{}", transformerName, httpResponse, headersString, new String(httpResponse.body()));
 
-            resHeadersMap.putAll(httpResponse.headers());
-            body = httpResponse.body();
-        }
+				String onHttpException = reqConfig(recordHeaders, "httpClient.onException");
+
+				if("original".equalsIgnoreCase(onHttpException)) {
+					return record;
+				}
+
+				if(!"pass-thru".equalsIgnoreCase(onHttpException)) {
+					throw new HttpResponseException(httpResponse);
+				}
+			}
+
+			resHeadersMap.putAll(httpResponse.headers());
+			body = httpResponse.body();
+		}
 
 /*
-        if(configured(recordHeaders, "response-mode", "original", false)) {
-            resHeadersMap.putAll(origHeadersMap);
-            // body = record.value().toArray();
-        }
+		if(configured(recordHeaders, "response-mode", "original", false)) {
+			resHeadersMap.putAll(origHeadersMap);
+			// body = record.value().toArray();
+		}
 */
 
-        Date resDate = new Date();
-        long reqRunTime = resDate.getTime() - reqDate.getTime();
+		Date resDate = new Date();
+		long reqRunTime = resDate.getTime() - reqDate.getTime();
 
-        // Broker headers should never be returned by the called service.
-        resHeadersMap.entrySet().removeIf(entry -> {
-            boolean shouldRemove = entry.getKey().matches(headerPrefixPattern);
-            if(shouldRemove) {
-                log.debug("{}: response header {} not added, matches headerPrefixPattern {}", transformerName, entry.getKey(), headerPrefixPattern);
-            }
-            return shouldRemove;
-        });
+		// Broker headers should never be returned by the called service.
+		resHeadersMap.entrySet().removeIf(entry -> {
+			boolean shouldRemove = entry.getKey().matches(headerPrefixPattern);
+			if(shouldRemove) {
+				log.debug("{}: response header {} not added, matches headerPrefixPattern {}", transformerName, entry.getKey(), headerPrefixPattern);
+			}
+			return shouldRemove;
+		});
 
-        if(configured("headers.res", "hostname", false)) {
-            resHeadersMap.put(headerPrefix+"hostname", Arrays.asList(brokerHostname));
-        }
+		if(configured("headers.res", "hostname", false)) {
+			resHeadersMap.put(headerPrefix+"hostname", Arrays.asList(brokerHostname));
+		}
 
-        if(null != envHeadersPattern && configured(recordHeaders, "headers.res", "env", false)) {
-            System.getenv().entrySet().stream()
-                .filter( entry -> {
-                    if(entry.getKey().matches(envHeadersPattern)) {
-                        log.debug("{}: env header {} added, matches headers.envPattern {}", transformerName, entry.getKey(), envHeadersPattern);
-                        return true;
-                    }
-                    return false;
-                } )
-                .forEach( entry -> resHeadersMap.put(headerPrefix+"env-"+entry.getKey().replaceAll("_","-"), Arrays.asList(entry.getValue())) );
-        }
+		if(null != envHeadersPattern && configured(recordHeaders, "headers.res", "env", false)) {
+			System.getenv().entrySet().stream()
+				.filter( entry -> {
+					if(entry.getKey().matches(envHeadersPattern)) {
+						log.debug("{}: env header {} added, matches headers.envPattern {}", transformerName, entry.getKey(), envHeadersPattern);
+						return true;
+					}
+					return false;
+				} )
+				.forEach( entry -> resHeadersMap.put(headerPrefix+"env-"+entry.getKey().replaceAll("_","-"), Arrays.asList(entry.getValue())) );
+		}
 
-        Date outDate = new Date();
-        long runTime = outDate.getTime() - inDate.getTime();
+		Date outDate = new Date();
+		long runTime = outDate.getTime() - inDate.getTime();
 
-        if(configured("headers.res", "time", false)) {
-            resHeadersMap.put(headerPrefix+"in-time", Arrays.asList(""+inDate.getTime()));
-            resHeadersMap.put(headerPrefix+"req-time", Arrays.asList(""+reqDate.getTime()));
-            resHeadersMap.put(headerPrefix+"res-time", Arrays.asList(""+resDate.getTime()));
-            resHeadersMap.put(headerPrefix+"out-time", Arrays.asList(""+outDate.getTime()));
-        }
+		if(configured("headers.res", "time", false)) {
+			resHeadersMap.put(headerPrefix+"in-time", Arrays.asList(""+inDate.getTime()));
+			resHeadersMap.put(headerPrefix+"req-time", Arrays.asList(""+reqDate.getTime()));
+			resHeadersMap.put(headerPrefix+"res-time", Arrays.asList(""+resDate.getTime()));
+			resHeadersMap.put(headerPrefix+"out-time", Arrays.asList(""+outDate.getTime()));
+		}
 
-        if(configured("headers.res", "timespan", false)) {
-            resHeadersMap.put(headerPrefix+"req-timespan", Arrays.asList(""+reqRunTime));
-            resHeadersMap.put(headerPrefix+"run-timespan", Arrays.asList(""+runTime));
-        }
+		if(configured("headers.res", "timespan", false)) {
+			resHeadersMap.put(headerPrefix+"req-timespan", Arrays.asList(""+reqRunTime));
+			resHeadersMap.put(headerPrefix+"run-timespan", Arrays.asList(""+runTime));
+		}
 
-        Header[] headers = headers(resHeadersMap);
+		Header[] headers = headers(resHeadersMap);
 
-        log.trace("{}: res body {}", transformerName, body.length, body);
-        log.trace("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
+		log.trace("{}: res body {}", transformerName, body.length, body);
+		log.trace("{}: res body String {}", transformerName, body.length, new String(body, StandardCharsets.UTF_8) );
 
-        return newRecord(recordBatch, record, headers, body);
-    }
+		return newRecord(recordBatch, record, headers, body);
+	}
 }
 

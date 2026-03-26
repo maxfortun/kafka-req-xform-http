@@ -88,6 +88,9 @@ httpHeaderPrefix.scopes=(?i)^(app)$
 headers.res=(?i)^(env|time|timespan|hostname)$
 headers.res.scopes=(?i)^(app|request)$
 
+headers.key=key
+headers.key.scopes=(?i)^(app|request)$
+
 headers.http=cl-api-header-prefix=cl-api-
 
 map=false
