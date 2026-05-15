@@ -31,6 +31,8 @@ import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuil
 import org.apache.hc.core5.http.HeaderElements;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.protocol.HttpContext;
+import org.apache.hc.client5.http.protocol.HttpClientContext;
+import org.apache.hc.core5.http.HttpHost;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -155,9 +157,17 @@ public class AHC5HttpClient extends AbstractHttpClient {
 
     public HttpResponse send(AbstractHttpRequest httpRequest) throws Exception {
         logPoolStats();
-        return httpClient.execute(((AHC5HttpRequest)httpRequest).httpRequest(), httpResponse -> { 
-            return new AHC5HttpResponse((AHC5HttpRequest)httpRequest, httpResponse);
-        });
+        HttpClientContext context = HttpClientContext.create();
+        try {
+            return httpClient.execute(((AHC5HttpRequest)httpRequest).httpRequest(), context, httpResponse -> {
+                return new AHC5HttpResponse((AHC5HttpRequest)httpRequest, httpResponse);
+            });
+        } catch (Exception e) {
+            HttpHost targetHost = context.getTargetHost();
+            String connectionInfo = targetHost != null ? targetHost.toHostString() : "unknown";
+            log.error("{}: HTTP request failed, target: {}", transformer.transformerName, connectionInfo, e);
+            throw e;
+        }
     }
 
     private void logPoolStats() {
