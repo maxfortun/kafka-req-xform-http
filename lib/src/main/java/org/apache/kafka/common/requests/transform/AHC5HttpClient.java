@@ -33,6 +33,7 @@ import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.protocol.HttpContext;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
 import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.protocol.HttpCoreContext;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -163,7 +164,7 @@ public class AHC5HttpClient extends AbstractHttpClient {
                 return new AHC5HttpResponse((AHC5HttpRequest)httpRequest, httpResponse);
             });
         } catch (Exception e) {
-            HttpHost targetHost = context.getTargetHost();
+            HttpHost targetHost = (HttpHost) context.getAttribute(HttpCoreContext.HTTP_TARGET_HOST);
             String connectionInfo = targetHost != null ? targetHost.toHostString() : "unknown";
             log.error("{}: HTTP request failed, target: {}", transformer.transformerName, connectionInfo, e);
             throw e;
