@@ -121,9 +121,9 @@ The `AHC5HttpClient` (Apache HttpClient 5) provides configurable connection pool
 | `httpClient.soTimeout` | Infinite | seconds | Socket SO_TIMEOUT - max time waiting for data on an established connection |
 | `httpClient.socketTimeout` | Infinite | seconds | Socket timeout for connection-level operations |
 | `httpClient.connectTimeout` | Infinite | seconds | Timeout for establishing a new connection |
-| `httpClient.connTimeToLiveInMinutes` | 10 | minutes | Maximum time a connection can be kept alive in the pool |
+| `httpClient.connTimeToLiveInSeconds` | 10 | seconds | Maximum time a connection can be kept alive in the pool |
 | `httpClient.connValidateAfterInactivityInSeconds` | 5 | seconds | Validate connections after this inactivity period before reuse |
-| `httpClient.connEvictIdleConnectionsInMinutes` | 10 | minutes | Background eviction of idle connections (runs periodically) |
+| `httpClient.connEvictIdleConnectionsInSeconds` | 10 | seconds | Background eviction of idle connections (runs periodically) |
 | `httpClient.closeIdleConnectionsInSeconds` | 30 | seconds | Close idle connections older than this at startup |
 | `httpClient.maxConnPerRoute` | 200 | integer | Maximum connections per route (host) |
 | `httpClient.maxConnTotal` | 1000 | integer | Maximum total connections in the pool |
@@ -150,9 +150,9 @@ httpClient.socketTimeout=30
 httpClient.connectTimeout=10
 
 # Connection pool
-httpClient.connTimeToLiveInMinutes=5
+httpClient.connTimeToLiveInSeconds=10
 httpClient.connValidateAfterInactivityInSeconds=5
-httpClient.connEvictIdleConnectionsInMinutes=10
+httpClient.connEvictIdleConnectionsInSeconds=10
 httpClient.closeIdleConnectionsInSeconds=30
 httpClient.maxConnPerRoute=100
 httpClient.maxConnTotal=500

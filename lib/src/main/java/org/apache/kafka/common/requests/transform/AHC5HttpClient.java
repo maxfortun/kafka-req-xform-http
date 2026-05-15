@@ -69,13 +69,13 @@ public class AHC5HttpClient extends AbstractHttpClient {
                 .build()
             )
             .setPoolConcurrencyPolicy(PoolConcurrencyPolicy.LAX)
-            .setConnPoolPolicy(PoolReusePolicy.LIFO)
+            .setConnPoolPolicy(PoolReusePolicy.FIFO)
             .setDefaultConnectionConfig(
                 ConnectionConfig.custom()
                 .setSocketTimeout(appTimeout("socketTimeout"))
                 .setConnectTimeout(appTimeout("connectTimeout"))
                 .setValidateAfterInactivity(TimeValue.ofSeconds(appInt("connValidateAfterInactivityInSeconds", 5)))
-                .setTimeToLive(TimeValue.ofMinutes(appInt("connTimeToLiveInMinutes", 10)))
+                .setTimeToLive(TimeValue.ofSeconds(appInt("connTimeToLiveInSeconds", 10)))
                 .build()
             )
             .setDnsResolver(new DnsResolver() {
@@ -122,7 +122,7 @@ public class AHC5HttpClient extends AbstractHttpClient {
                     return defaultKeepAlive;
                 }
             })
-            .evictIdleConnections(TimeValue.ofMinutes(appInt("connEvictIdleConnectionsInMinutes", 10)))
+            .evictIdleConnections(TimeValue.ofSeconds(appInt("connEvictIdleConnectionsInSeconds", 10)))
             .evictExpiredConnections()
             .build();
 
