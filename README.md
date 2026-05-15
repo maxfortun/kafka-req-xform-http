@@ -4,6 +4,7 @@
 ### Build
 Must set `KAFKA_VERSION` for build to work.
 ```
+export JAVA_HOME=$(/usr/libexec/java_home -v 17.0.16)
 KAFKA_VERSION=3.7.2-SNAPSHOT ./gradlew jar
 ```
 or
