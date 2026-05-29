@@ -49,7 +49,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 	private final String headerPrefixPattern;
 	private final String persistentHeadersPattern;
 	private final String envHeadersPattern;
-	private final String keyHeaderName;
+	private final String logKeyHeaderName;
 
 	public HttpProduceRequestDataTransformer(String transformerName) throws Exception {
 		super(transformerName);
@@ -57,7 +57,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 		headerPrefixPattern = "(?i)^"+headerPrefix+".*$";
 		persistentHeadersPattern = appConfig("headers.persistentPattern");
 		envHeadersPattern = appConfig("headers.envPattern");
-		keyHeaderName = appConfig("headers.key");
+		logKeyHeaderName = appConfig("headers.logKey");
 	}
 
 	protected Record transform(
@@ -71,10 +71,10 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
 		Date inDate = new Date();
 
-		String key = keyFromRecord(record, recordHeaders);
+		String logKey = logKeyFromRecord(record, recordHeaders);
 		try {
 			// log this to track started threads that hang
-			log.debug("{}: start {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), key);
+			log.debug("{}: start {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), logKey);
 
 			Record transformed = transformImpl(
 				topicProduceData,
@@ -88,13 +88,13 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 			Date outDate = new Date();
 			long runTime = outDate.getTime() - inDate.getTime();
 
-			log.info("{}: ok {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), key, runTime);
+			log.info("{}: ok {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), logKey, runTime);
 
 			return transformed;
 		} catch(Exception e) {
 			Date outDate = new Date();
 			long runTime = outDate.getTime() - inDate.getTime();
-			log.warn("{}: error {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), key, runTime, e);
+			log.warn("{}: error {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), logKey, runTime, e);
 
 			String onException = reqConfig(recordHeaders, "onException");
 
@@ -141,23 +141,27 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 		}
 	}
 
-	private String keyFromRecord(Record record, RecordHeaders recordHeaders) {
-		String key = Utils.utf8(record.key());
-		if(null != key) {
-			return "k:"+key;
-		}
+	private String logKeyFromRecord(Record record, RecordHeaders recordHeaders) {
+		String logKey = "";
+		String recordKey = Utils.utf8(record.key());
+		if(null != recordKey) {
+			logKey += "k:"+recordKey;
+		} 
 
-		if(null != keyHeaderName) {
-			Header header = recordHeaders.lastHeader(keyHeaderName);
+		if(null != logKeyHeaderName) {
+			Header header = recordHeaders.lastHeader(logKeyHeaderName);
 			if(null != header) {
-				key = Utils.utf8(header.value());
-				if(null != key && !key.isEmpty()) {
-					return "h:"+keyHeaderName+":"+key;
+				String headerKey = Utils.utf8(header.value());
+				if(null != headerKey && !headerKey.isEmpty()) {
+					if(!logKey.isEmpty()) {
+						logKey += "-";
+					}
+					logKey += "h:"+logKeyHeaderName+":"+headerKey;
 				}
 			}
 		}
 
-		return key;
+		return logKey;
 	}
 
 	private void addErrorHeaders(RecordHeaders recordHeaders, Exception e) {
