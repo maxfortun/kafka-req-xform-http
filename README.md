@@ -20,6 +20,7 @@ All headers have a prefix of `plugin prefix`-`broker`-.
 |uri|||Uri of the service to forward requests to. Overrides default.|
 |enable|true|true,false|Is forwarding to service enabled?|
 |headers.in||env,time,timespan,hostname|Include in response headers|
+|headers.recordKey|kafka.KEY||HTTP header name for the record key. If set, uses original casing from request headers if present.|
 |httpClient.onException|fail|fail,pass-thru,original|HTTP response error handling behavior|
 |onException|throw|throw,headers,original,dlq|Transform exception handling behavior|
 |onException.dlqTopic|{topic}-dlq||Dead-letter queue topic name (used when onException=dlq)|
@@ -35,7 +36,7 @@ The following headers are automatically included in HTTP requests to the downstr
 | `{prefix}partition-index` | Partition index |
 | `{prefix}record-offset` | Record offset within the partition |
 | `{prefix}req-time` | Request timestamp (epoch millis) |
-| `kafka.KEY` | Record key (if present) |
+| `kafka.KEY` (or configured name) | Record key (if present). Header name is configurable via `headers.recordKey`; if configured and a matching header exists in the request (case-insensitive), uses the original casing. |
 
 #### onException Values
 
@@ -91,6 +92,9 @@ headers.res.scopes=(?i)^(app|request)$
 
 headers.logKey=logKey
 headers.logKey.scopes=(?i)^(app|request)$
+
+headers.recordKey=kafka.KEY
+headers.recordKey.scopes=(?i)^(app|request)$
 
 headers.http=cl-api-header-prefix=cl-api-
 

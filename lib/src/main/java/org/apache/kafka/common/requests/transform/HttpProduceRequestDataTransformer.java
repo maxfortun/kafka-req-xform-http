@@ -141,6 +141,15 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 		}
 	}
 
+	private String findOriginalHeaderName(Header[] headers, String headerName) {
+		for(Header header : headers) {
+			if(header.key().equalsIgnoreCase(headerName)) {
+				return header.key();
+			}
+		}
+		return null;
+	}
+
 	private String logKeyFromRecord(Record record, RecordHeaders recordHeaders) {
 		String logKey = "";
 		String recordKey = Utils.utf8(record.key());
@@ -260,7 +269,16 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
 		String recordKey = Utils.utf8(record.key());
 		if(null != recordKey) {
-			httpRequest.header("kafka.KEY", recordKey);
+			String recordKeyHeaderName = reqConfig(recordHeaders, "headers.recordKey");
+			if(null == recordKeyHeaderName) {
+				recordKeyHeaderName = "kafka.KEY";
+			} else {
+				String originalSpelling = findOriginalHeaderName(record.headers(), recordKeyHeaderName);
+				if(null != originalSpelling) {
+					recordKeyHeaderName = originalSpelling;
+				}
+			}
+			httpRequest.header(recordKeyHeaderName, recordKey);
 		}
 		httpRequest.body(recordKey, record.value());
 
