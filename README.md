@@ -114,6 +114,63 @@ map-topic.scopes=(?i)^(app)$
 
 ---
 
+## Environment Variables
+
+Transformers do not have a fixed list of environment variables. Instead, **every config key** can be overridden per transformer from the environment. On top of that, a few environment variables are read directly.
+
+### Config Resolution Order
+
+For a transformer named `{name}` (the name used in `TransformingProduceRequestParser.properties`, e.g. `content-lake`), the value of config key `{key}` is resolved as follows. The first value found wins:
+
+| # | Source | Name | Example (`content-lake`, key `uri`) |
+|---|---|---|---|
+| 1 | Record header (only if `{key}.scopes` matches `request`) | `{headerPrefix}{key}` with non `[a-zA-Z0-9-]` chars replaced by `-` | `content-lake-broker-uri` |
+| 2 | JVM system property | `{name}-{key}` | `-Dcontent-lake-uri=http://...` |
+| 3 | Environment variable | `{name}_{key}`, with `.` and `-` in `{name}` replaced by `_` | `content_lake_uri=http://...` |
+| 4 | Properties file on the classpath | `{name}.properties` → `{key}` | `content-lake.properties` → `uri=http://...` |
+
+Notes:
+- Only the transformer **name** is normalized. The **key** is used exactly as written, including case, dots and dashes. For example `httpClient.soTimeout` becomes `content_lake_httpClient.soTimeout`, and `enable-send` becomes `content_lake_enable-send`. Most shells can't `export` names like these, but you can set them with `env`, `docker run -e`, or a Kubernetes `env:` entry.
+- An empty value is still a value. For example, `content_lake_enable=` (empty) stops the lookup and hides the properties file value. It is then treated as "not configured".
+- `{key}.scopes` goes through the same lookup, from step 2 onwards. So the environment can also turn request-header overrides on or off, e.g. `content_lake_enable.scopes=(?i)^(app)$`.
+- Keys with no default must resolve somewhere. Otherwise the transform throws `IllegalArgumentException` (`Required header ... is not specified in request and has no default value.`), which is then handled according to `onException`. For `HttpProduceRequestDataTransformer`, `enable` has no default.
+
+### Overridable Keys (`HttpProduceRequestDataTransformer`)
+
+Env var names are shown for a transformer named `content-lake`.
+
+| Key | Env var | Code default | Effect |
+|---|---|---|---|
+| `enable` | `content_lake_enable` | none (required) | Pattern matched against `false`; if it matches, the record passes through without an HTTP call |
+| `enable-send` | `content_lake_enable-send` | `true` | Send the HTTP request to the service |
+| `uri` | `content_lake_uri` | none | Service URI |
+| `topics.namePattern` | `content_lake_topics.namePattern` | none (all topics) | Topics to transform |
+| `onException` | `content_lake_onException` | `throw` | Transform exception handling, see [onException Values](#onexception-values) |
+| `onException.dlqTopic` | `content_lake_onException.dlqTopic` | `__{topic-name}-dlq` | DLQ topic name |
+| `httpClient.class` | `content_lake_httpClient.class` | | HTTP client implementation |
+| `httpClient.onException` | `content_lake_httpClient.onException` | `fail` | HTTP error handling |
+| `httpClient.*` | `content_lake_httpClient.*` | | Timeouts and pool settings, see [AHC5 HTTP Client Configuration](#ahc5-http-client-configuration) |
+| `headers.prefix` | `content_lake_headers.prefix` | `{name}-broker-` | Prefix of the plugin's control headers |
+| `headers.http` | `content_lake_headers.http` | none | Extra `key=value` HTTP headers sent to the service |
+| `headers.persistentPattern` | `content_lake_headers.persistentPattern` | none | Response headers kept on the record |
+| `headers.transientPattern` | `content_lake_headers.transientPattern` | none | Headers forwarded to the service but not persisted |
+| `headers.envPattern` | `content_lake_headers.envPattern` | none | Env vars exposed as response headers (see below) |
+| `headers.res` | `content_lake_headers.res` | none | Which of `hostname,env,time,timespan` are added to the response |
+| `headers.logKey` | `content_lake_headers.logKey` | none | Record header used as log correlation key |
+| `headers.recordKey` | `content_lake_headers.recordKey` | `kafka.KEY` | HTTP header name for the record key |
+
+Each key's `.scopes` companion (e.g. `content_lake_uri.scopes`) can be overridden the same way.
+
+### Environment Variables Read Directly
+
+| Variable | Effect |
+|---|---|
+| `HOSTNAME` | Sent to the service as `{prefix}hostname`, and added to the response when `headers.res` matches `hostname` |
+| Any variable matching `headers.envPattern` | When `headers.res` matches `env`, added to the record as `{prefix}env-{NAME}`, with `_` replaced by `-` |
+| `CLASSPATH` | Where `{name}.properties` and `TransformingProduceRequestParser.properties` are found |
+
+---
+
 ## AHC5 HTTP Client Configuration
 
 The `AHC5HttpClient` (Apache HttpClient 5) provides configurable connection pooling and timeout settings. All parameters use the `httpClient.` prefix.
