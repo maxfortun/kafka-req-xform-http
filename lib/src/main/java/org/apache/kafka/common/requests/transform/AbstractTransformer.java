@@ -21,10 +21,13 @@ import java.io.IOException;
 
 import java.nio.ByteBuffer;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -48,13 +51,33 @@ public abstract class AbstractTransformer {
     private ResourceBundle resources = null;
 
     protected final String topicNamePattern;
+    // Request headers are looked up with each prefix in order; the first one found wins.
+    protected final List<String> headerPrefixes;
+    // Primary prefix, used for headers the transformer writes.
     protected final String headerPrefix;
+    // Matches headers with any of the prefixes.
+    protected final String headerPrefixPattern;
 
     public AbstractTransformer(String transformerName) {
         this.transformerName = transformerName;
 
         topicNamePattern = appConfig("topics.namePattern");
-        headerPrefix = appConfig("headers.prefix", transformerName+"-broker-");
+        headerPrefixes = parseHeaderPrefixes(appConfig("headers.prefix"), transformerName+"-broker-");
+        headerPrefix = headerPrefixes.get(0);
+        headerPrefixPattern = "(?i)^(" + headerPrefixes.stream().map(Pattern::quote).collect(Collectors.joining("|")) + ").*$";
+    }
+
+    static List<String> parseHeaderPrefixes(String value, String defaultValue) {
+        if(null != value) {
+            List<String> prefixes = Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(prefix -> !prefix.isEmpty())
+                .collect(Collectors.toList());
+            if(!prefixes.isEmpty()) {
+                return prefixes;
+            }
+        }
+        return Arrays.asList(defaultValue);
     }
 
     protected String appConfig(String key, String defaultValue) {
@@ -132,7 +155,7 @@ public abstract class AbstractTransformer {
         String pattern = reqConfig(recordHeaders, key);
         if(null == pattern || pattern.isEmpty()) {
             if(null == defaultValue) {
-                String message = "Required header " + headerPrefix + key + " is not specified in request and has no default value.";
+                String message = "Required header " + String.join(" or ", headerPrefixes.stream().map(prefix -> prefix + key).collect(Collectors.toList())) + " is not specified in request and has no default value.";
                 log.trace(message);
                 throw new IllegalArgumentException(message);
             }
@@ -150,16 +173,21 @@ public abstract class AbstractTransformer {
             return appConfig(key);
         }
 
-        String fullKey = headerPrefix+key.replaceAll("[^a-zA-Z0-9-]","-");
-        Header header = recordHeaders.lastHeader(fullKey);
-        if(null == header) {
-            log.trace("{}: No header {}", transformerName, fullKey);
-            return appConfig(key);
+        String headerKey = key.replaceAll("[^a-zA-Z0-9-]","-");
+        for(String prefix : headerPrefixes) {
+            String fullKey = prefix+headerKey;
+            Header header = recordHeaders.lastHeader(fullKey);
+            if(null == header) {
+                log.trace("{}: No header {}", transformerName, fullKey);
+                continue;
+            }
+
+            String value = Utils.utf8(header.value());
+            log.debug("{}: Header {} is {}.", transformerName, fullKey, value);
+            return value;
         }
 
-        String value = Utils.utf8(header.value());
-        log.debug("{}: Header {} is {}.", transformerName, fullKey, value);
-        return value;
+        return appConfig(key);
     }
 
 /*

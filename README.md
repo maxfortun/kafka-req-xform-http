@@ -13,7 +13,12 @@ KAFKA_VERSION=4.0.0-SNAPSHOT ./gradlew jar
 ```
 
 ### Request Headers
-All headers have a prefix of `plugin prefix`-`broker`-.
+All headers have a prefix of `plugin prefix`-`broker`-, configurable with `headers.prefix`.
+
+`headers.prefix` can be a comma separated list, e.g. `headers.prefix=cl-brk-,content-lake-broker-`. This is useful when moving to a new prefix:
+- For each setting, the prefixes are tried in order and the first header found is used. So `cl-brk-enable` wins over `content-lake-broker-enable`.
+- Headers with any of the prefixes are treated as broker headers: they are not forwarded to the service, and they are removed from service responses.
+- Headers the plugin writes (e.g. `{prefix}hostname`, `{prefix}error`, `{prefix}req-time`) use only the first prefix.
 
 |Name|Default|Values|Effect|
 |---|---|---|---|
@@ -124,7 +129,7 @@ For a transformer named `{name}` (the name used in `TransformingProduceRequestPa
 
 | # | Source | Name | Example (`content-lake`, key `uri`) |
 |---|---|---|---|
-| 1 | Record header (only if `{key}.scopes` matches `request`) | `{headerPrefix}{key}` with non `[a-zA-Z0-9-]` chars replaced by `-` | `content-lake-broker-uri` |
+| 1 | Record header (only if `{key}.scopes` matches `request`) | `{headerPrefix}{key}` with non `[a-zA-Z0-9-]` chars replaced by `-`; each prefix in `headers.prefix` is tried in order | `content-lake-broker-uri` |
 | 2 | JVM system property | `{name}-{key}` | `-Dcontent-lake-uri=http://...` |
 | 3 | Environment variable | `{name}_{key}`, with `.` and `-` in `{name}` replaced by `_` | `content_lake_uri=http://...` |
 | 4 | Properties file on the classpath | `{name}.properties` → `{key}` | `content-lake.properties` → `uri=http://...` |
@@ -150,7 +155,7 @@ Env var names are shown for a transformer named `content-lake`.
 | `httpClient.class` | `content_lake_httpClient.class` | | HTTP client implementation |
 | `httpClient.onException` | `content_lake_httpClient.onException` | `fail` | HTTP error handling |
 | `httpClient.*` | `content_lake_httpClient.*` | | Timeouts and pool settings, see [AHC5 HTTP Client Configuration](#ahc5-http-client-configuration) |
-| `headers.prefix` | `content_lake_headers.prefix` | `{name}-broker-` | Prefix of the plugin's control headers |
+| `headers.prefix` | `content_lake_headers.prefix` | `{name}-broker-` | Comma separated prefixes of the plugin's control headers, tried in order. The first one is used for headers the plugin writes |
 | `headers.http` | `content_lake_headers.http` | none | Extra `key=value` HTTP headers sent to the service |
 | `headers.persistentPattern` | `content_lake_headers.persistentPattern` | none | Response headers kept on the record |
 | `headers.transientPattern` | `content_lake_headers.transientPattern` | none | Headers forwarded to the service but not persisted |

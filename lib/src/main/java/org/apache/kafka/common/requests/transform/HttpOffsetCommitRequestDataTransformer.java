@@ -37,7 +37,6 @@ public class HttpOffsetCommitRequestDataTransformer extends AbstractOffsetCommit
 
     private static final String brokerHostname = System.getenv("HOSTNAME");
 
-    private final String headerPrefixPattern;
 
     // Batching configuration
     private final int batchCount;
@@ -59,7 +58,6 @@ public class HttpOffsetCommitRequestDataTransformer extends AbstractOffsetCommit
 
     public HttpOffsetCommitRequestDataTransformer(String transformerName) throws Exception {
         super(transformerName);
-        headerPrefixPattern = "(?i)^" + headerPrefix + ".*$";
 
         // Parse batching configuration
         String batchCountStr = appConfig("batch.count");

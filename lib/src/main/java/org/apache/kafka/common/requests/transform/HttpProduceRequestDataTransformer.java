@@ -46,7 +46,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 
 	private static final String brokerHostname = System.getenv("HOSTNAME");
 
-	private final String headerPrefixPattern;
 	private final String persistentHeadersPattern;
 	private final String envHeadersPattern;
 	private final String logKeyHeaderName;
@@ -54,7 +53,6 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 	public HttpProduceRequestDataTransformer(String transformerName) throws Exception {
 		super(transformerName);
 
-		headerPrefixPattern = "(?i)^"+headerPrefix+".*$";
 		persistentHeadersPattern = appConfig("headers.persistentPattern");
 		envHeadersPattern = appConfig("headers.envPattern");
 		logKeyHeaderName = appConfig("headers.logKey");

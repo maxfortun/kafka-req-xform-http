@@ -38,11 +38,9 @@ public class HttpOffsetFetchResponseDataTransformer extends AbstractOffsetFetchR
 
     private static final String brokerHostname = System.getenv("HOSTNAME");
 
-    private final String headerPrefixPattern;
 
     public HttpOffsetFetchResponseDataTransformer(String transformerName) throws Exception {
         super(transformerName);
-        headerPrefixPattern = "(?i)^" + headerPrefix + ".*$";
     }
 
     @Override
