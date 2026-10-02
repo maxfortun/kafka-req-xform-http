@@ -16,6 +16,8 @@
  */
 package org.apache.kafka.common.requests.transform;
 
+import java.nio.charset.StandardCharsets;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,8 +27,21 @@ public class HttpResponseException extends Exception {
     private HttpResponse httpResponse;
 
     public HttpResponseException(HttpResponse httpResponse) {
-        super(httpResponse.request().uri()+" returned "+httpResponse.statusCode()+"\n"+new String(httpResponse.body()));
+        super(httpResponse.request().uri()+" returned "+httpResponse.statusCode()+"\n"+describe(httpResponse));
         this.httpResponse = httpResponse;
     }
-}
 
+    public HttpResponse httpResponse() {
+        return httpResponse;
+    }
+
+    public static String describe(HttpResponse httpResponse) {
+        AbstractHttpRequest request = httpResponse.request();
+        return "--- request ---\n"
+            + (null == request ? "(unavailable)" : request.toString()) + "\n"
+            + "--- response ---\n"
+            + httpResponse.statusCode() + "\n"
+            + AbstractHttpRequest.formatHeaders(httpResponse.headers()) + "\n\n"
+            + new String(httpResponse.body(), StandardCharsets.UTF_8);
+    }
+}

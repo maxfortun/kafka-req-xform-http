@@ -17,6 +17,10 @@
 package org.apache.kafka.common.requests.transform;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 
@@ -50,11 +54,20 @@ public class AHC5HttpRequest extends AbstractHttpRequest {
             header(headerPrefix+"message-key", key);
         }
 
+		body = null == byteBuffer ? null : byteBuffer.duplicate();
 		if(null != byteBuffer) {
         	httpRequest.setEntity(new ByteBufferEntity(byteBuffer, ContentType.DEFAULT_BINARY));
 		}
 
         return this;
+    }
+
+    public Map<String, List<String>> headers() {
+        Map<String, List<String>> headersMap = new LinkedHashMap<>();
+        for(org.apache.hc.core5.http.Header header : httpRequest.getHeaders()) {
+            headersMap.computeIfAbsent(header.getName(), k -> new ArrayList<>()).add(header.getValue());
+        }
+        return headersMap;
     }
 
     public HttpPost httpRequest() {

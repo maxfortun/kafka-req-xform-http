@@ -17,9 +17,16 @@
 package org.apache.kafka.common.requests.transform;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public abstract class AbstractHttpRequest {
     private final String uri;
+
+    // Kept so the request body can be logged on error; the underlying clients don't expose it after building.
+    protected ByteBuffer body;
 
     public AbstractHttpRequest(String uri) throws Exception {
         this.uri = uri;
@@ -29,6 +36,19 @@ public abstract class AbstractHttpRequest {
         return uri;
     }
 
+    @Override
+    public String toString() {
+        String bodyString = null == body ? "" : StandardCharsets.UTF_8.decode(body.duplicate()).toString();
+        return "POST " + uri + "\n" + formatHeaders(headers()) + "\n\n" + bodyString;
+    }
+
+    static String formatHeaders(Map<String, List<String>> headers) {
+        return headers.entrySet().stream()
+            .map(entry -> entry.getKey() + ": " + String.join(", ", entry.getValue()))
+            .collect(Collectors.joining("\n"));
+    }
+
+    public abstract Map<String, List<String>> headers();
     public abstract AbstractHttpRequest header(String key, String value);
     public abstract AbstractHttpRequest body(String key, ByteBuffer byteBuffer);
 }

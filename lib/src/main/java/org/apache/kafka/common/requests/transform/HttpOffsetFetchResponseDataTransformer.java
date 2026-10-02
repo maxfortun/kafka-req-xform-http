@@ -144,12 +144,7 @@ public class HttpOffsetFetchResponseDataTransformer extends AbstractOffsetFetchR
             log.debug("{}: httpResponse {}", transformerName, httpResponse);
 
             if (httpResponse.statusCode() != 200) {
-                String headersString = httpResponse.headers().entrySet().stream()
-                    .map(entry -> entry.getKey() + ": " + String.join(", ", entry.getValue()))
-                    .collect(Collectors.joining("\n"));
-
-                log.warn("{}: httpResponse {}\n{}\n{}", transformerName, httpResponse, headersString,
-                    new String(httpResponse.body()));
+                log.warn("{}: httpResponse {}\n{}", transformerName, httpResponse, HttpResponseException.describe(httpResponse));
 
                 String onHttpException = appConfig("httpClient.onException");
                 if (!"pass-thru".equalsIgnoreCase(onHttpException) && !"ignore".equalsIgnoreCase(onHttpException)) {
@@ -227,12 +222,7 @@ public class HttpOffsetFetchResponseDataTransformer extends AbstractOffsetFetchR
             log.debug("{}: httpResponse {}", transformerName, httpResponse);
 
             if (httpResponse.statusCode() != 200) {
-                String headersString = httpResponse.headers().entrySet().stream()
-                    .map(entry -> entry.getKey() + ": " + String.join(", ", entry.getValue()))
-                    .collect(Collectors.joining("\n"));
-
-                log.warn("{}: httpResponse {}\n{}\n{}", transformerName, httpResponse, headersString,
-                    new String(httpResponse.body()));
+                log.warn("{}: httpResponse {}\n{}", transformerName, httpResponse, HttpResponseException.describe(httpResponse));
 
                 String onHttpException = appConfig("httpClient.onException");
                 if (!"pass-thru".equalsIgnoreCase(onHttpException) && !"ignore".equalsIgnoreCase(onHttpException)) {

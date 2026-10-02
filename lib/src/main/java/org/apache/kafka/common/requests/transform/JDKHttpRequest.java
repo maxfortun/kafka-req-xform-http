@@ -20,6 +20,9 @@ import java.nio.ByteBuffer;
 
 import java.net.URI;
 
+import java.util.List;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,8 +59,13 @@ public class JDKHttpRequest extends AbstractHttpRequest {
 
         java.net.http.HttpRequest.BodyPublisher bodyPublisher = java.net.http.HttpRequest.BodyPublishers.ofByteArray(array);
         httpRequestBuilder.POST(bodyPublisher);
+        body = ByteBuffer.wrap(array);
 
         return this;
+    }
+
+    public Map<String, List<String>> headers() {
+        return httpRequestBuilder.build().headers().map();
     }
 
     public java.net.http.HttpRequest httpRequest() {
