@@ -40,6 +40,7 @@ import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.DefaultRecord;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.MemoryRecordsBuilder;
+import org.apache.kafka.common.record.MutableRecordBatch;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.Records;
@@ -80,16 +81,19 @@ public abstract class AbstractProduceRequestDataTransformer extends AbstractTran
 
                 MemoryRecords memoryRecords = (MemoryRecords)partitionProduceData.records();
 
-                MemoryRecordsBuilder memoryRecordsBuilder = MemoryRecords.builder(
-                    ByteBuffer.allocate(memoryRecords.sizeInBytes()),
-                    CompressionType.NONE,
-                    TimestampType.CREATE_TIME,
-                    0L
-                );
-
+                ByteBufferOutputStream recordsOut = new ByteBufferOutputStream(memoryRecords.sizeInBytes());
 
                 int batchId = 0;
-                for (RecordBatch recordBatch : memoryRecords.batches()) {
+                for (MutableRecordBatch recordBatch : memoryRecords.batches()) {
+
+                    if (recordBatch.isControlBatch()) {
+                        recordBatch.writeTo(recordsOut);
+                        batchId++;
+                        continue;
+                    }
+
+                    // One output batch per input batch, so idempotence and transactions survive the rewrite.
+                    MemoryRecordsBuilder memoryRecordsBuilder = newBatchBuilder(recordBatch, recordBatch.sizeInBytes());
 
                     int recordId = 0;
                     for (Record record : recordBatch) {
@@ -114,9 +118,14 @@ public abstract class AbstractProduceRequestDataTransformer extends AbstractTran
                             Record dlqRecord = removeDlqHeader(recordBatch, transformedRecord, dlqTopicHeader);
                             MemoryRecordsBuilder dlqBuilder = getDlqBuilder(dlqBuilders, dlqTopic, partitionProduceData.index(), memoryRecords.sizeInBytes());
                             dlqBuilder.append(dlqRecord);
+
+                            // Idempotent batches can't have gaps in their sequence numbers, so the record also keeps its slot in the original topic.
+                            if (recordBatch.hasProducerId()) {
+                                memoryRecordsBuilder.appendWithOffset(record.offset(), dlqRecord);
+                            }
                         } else {
                             // Normal routing to original topic
-                            memoryRecordsBuilder.append(transformedRecord);
+                            memoryRecordsBuilder.appendWithOffset(record.offset(), transformedRecord);
                         }
 
                         if(log.isTraceEnabled()) {
@@ -134,10 +143,13 @@ public abstract class AbstractProduceRequestDataTransformer extends AbstractTran
                         recordId++;
                     }
 
+                    recordsOut.write(memoryRecordsBuilder.build().buffer());
                     batchId++;
                 }
 
-                partitionProduceData.setRecords(memoryRecordsBuilder.build());
+                ByteBuffer recordsBuffer = recordsOut.buffer();
+                recordsBuffer.flip();
+                partitionProduceData.setRecords(MemoryRecords.readableRecords(recordsBuffer));
             }
         }
 

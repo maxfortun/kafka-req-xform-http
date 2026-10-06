@@ -39,6 +39,7 @@ import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.DefaultRecord;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.MemoryRecordsBuilder;
+import org.apache.kafka.common.record.MutableRecordBatch;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.Records;
@@ -75,22 +76,26 @@ public abstract class AbstractFetchResponseDataTransformer extends AbstractTrans
 
                 MemoryRecords memoryRecords = (MemoryRecords)partitionData.records();
 
-                MemoryRecordsBuilder memoryRecordsBuilder = MemoryRecords.builder(
-                    ByteBuffer.allocate(memoryRecords.sizeInBytes()),
-                    CompressionType.NONE,
-                    TimestampType.CREATE_TIME,
-                    0L
-                );
-
+                ByteBufferOutputStream recordsOut = new ByteBufferOutputStream(memoryRecords.sizeInBytes());
 
                 int batchId = 0;
-                for (RecordBatch recordBatch : memoryRecords.batches()) {
+                for (MutableRecordBatch recordBatch : memoryRecords.batches()) {
+
+                    // Transaction markers must reach the consumer unchanged for read_committed to work.
+                    if (recordBatch.isControlBatch()) {
+                        recordBatch.writeTo(recordsOut);
+                        batchId++;
+                        continue;
+                    }
+
+                    // One output batch per input batch, keeping offsets, producer ids and the transactional flag.
+                    MemoryRecordsBuilder memoryRecordsBuilder = newBatchBuilder(recordBatch, recordBatch.sizeInBytes());
 
                     int recordId = 0;
                     for (Record record : recordBatch) {
 
                         Record transformedRecord = transform(fetchableTopicResponse, partitionData, recordBatch, record, new RecordHeaders(record.headers()), version);
-                        memoryRecordsBuilder.append(transformedRecord);
+                        memoryRecordsBuilder.appendWithOffset(record.offset(), transformedRecord);
 
                         if(log.isTraceEnabled()) {
                             log.trace("{}: fetchableTopicResponse.partitionData.recordBatch[{}].record[{}] in:\n{}\n{}  B:{}={}",
@@ -107,10 +112,13 @@ public abstract class AbstractFetchResponseDataTransformer extends AbstractTrans
                         recordId++;
                     }
 
+                    recordsOut.write(memoryRecordsBuilder.build().buffer());
                     batchId++;
                 }
 
-                partitionData.setRecords(memoryRecordsBuilder.build());
+                ByteBuffer recordsBuffer = recordsOut.buffer();
+                recordsBuffer.flip();
+                partitionData.setRecords(MemoryRecords.readableRecords(recordsBuffer));
             }
         }
 

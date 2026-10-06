@@ -33,7 +33,10 @@ import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 
+import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.DefaultRecord;
+import org.apache.kafka.common.record.MemoryRecords;
+import org.apache.kafka.common.record.MemoryRecordsBuilder;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.TimestampType;
@@ -211,6 +214,32 @@ public abstract class AbstractTransformer {
     protected void setHeader(RecordHeaders recordHeaders, String key, String value) {
         recordHeaders.remove(key);
         recordHeaders.add(key, value.getBytes());
+    }
+
+    /**
+     * Builder for a batch that replaces recordBatch, keeping its base offset, producer id/epoch,
+     * base sequence, transactional flag, timestamp type and partition leader epoch.
+     * Without these the broker loses idempotence and transactions, and consumers lose read_committed filtering.
+     * Records must be appended with appendWithOffset(original record offset, record) to keep sequences intact.
+     */
+    protected static MemoryRecordsBuilder newBatchBuilder(RecordBatch recordBatch, int initialSize) {
+        long logAppendTime = recordBatch.timestampType() == TimestampType.LOG_APPEND_TIME ?
+            recordBatch.maxTimestamp() : RecordBatch.NO_TIMESTAMP;
+
+        return MemoryRecords.builder(
+            ByteBuffer.allocate(initialSize),
+            RecordBatch.CURRENT_MAGIC_VALUE,
+            CompressionType.NONE,
+            recordBatch.timestampType(),
+            recordBatch.baseOffset(),
+            logAppendTime,
+            recordBatch.producerId(),
+            recordBatch.producerEpoch(),
+            recordBatch.baseSequence(),
+            recordBatch.isTransactional(),
+            false,
+            recordBatch.partitionLeaderEpoch()
+        );
     }
 
     protected Record newRecord(RecordBatch recordBatch, Record record, Header[] headers, byte[] body) throws IOException {
