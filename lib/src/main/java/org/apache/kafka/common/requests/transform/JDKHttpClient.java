@@ -27,7 +27,8 @@ public class JDKHttpClient extends AbstractHttpClient {
     private static final Logger log = LoggerFactory.getLogger(JDKHttpClient.class);
 
     private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
-        .version(java.net.http.HttpClient.Version.HTTP_2)
+        // HTTP/1.1 only: HTTP/2 lowercases header names, and the service treats them as case sensitive.
+        .version(java.net.http.HttpClient.Version.HTTP_1_1)
         .build();
 
     private final Duration requestTimeout;

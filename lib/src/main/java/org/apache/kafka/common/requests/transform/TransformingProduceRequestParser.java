@@ -89,6 +89,13 @@ public class TransformingProduceRequestParser implements ProduceRequestParser {
 
         log.trace("produceRequestData out: {}", produceRequestData);
 
-        return new ProduceRequest(produceRequestData, version);
+        ProduceRequest produceRequest = new ProduceRequest(produceRequestData, version);
+
+        // Stashed for the ProduceResponseListener, which gets the records back with their assigned offsets.
+        if (ProducedRecords.enabled()) {
+            ProducedRecords.stash(produceRequest, produceRequestData);
+        }
+
+        return produceRequest;
     }
 }

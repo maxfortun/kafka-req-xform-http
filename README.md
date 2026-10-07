@@ -194,6 +194,7 @@ The `AHC5HttpClient` (Apache HttpClient 5) provides configurable connection pool
 | `httpClient.closeIdleConnectionsInSeconds` | 30 | seconds | Close idle connections older than this at startup |
 | `httpClient.maxConnPerRoute` | 200 | integer | Maximum connections per route (host) |
 | `httpClient.maxConnTotal` | 1000 | integer | Maximum total connections in the pool |
+| `httpClient.keepAliveTimeoutInSeconds` | 30 | seconds | How long an idle connection is kept alive when the server sends no `Keep-Alive` header |
 
 ### Connection Pool Settings
 
@@ -216,10 +217,11 @@ httpClient.soTimeout=60
 httpClient.socketTimeout=30
 httpClient.connectTimeout=10
 
-# Connection pool
-httpClient.connTimeToLiveInSeconds=10
+# Connection pool, tuned for long-lived connections (see Connection Reuse below)
+httpClient.connTimeToLiveInSeconds=600
 httpClient.connValidateAfterInactivityInSeconds=5
-httpClient.connEvictIdleConnectionsInSeconds=10
+httpClient.connEvictIdleConnectionsInSeconds=60
+httpClient.keepAliveTimeoutInSeconds=60
 httpClient.closeIdleConnectionsInSeconds=30
 httpClient.maxConnPerRoute=100
 httpClient.maxConnTotal=500
@@ -227,6 +229,16 @@ httpClient.maxConnTotal=500
 # Error handling
 httpClient.onException=fail
 ```
+
+### Connection Reuse
+
+All transformers that use the same `httpClient.class` share one client and one connection pool per JVM. The pool is configured by whichever transformer creates it first, so keep `httpClient.*` settings the same across transformers.
+
+The code defaults close every connection after 10 seconds (`connTimeToLiveInSeconds`), even busy ones, which means a new TCP handshake per pooled connection every 10 seconds. The sample above keeps connections for up to 10 minutes and drops them after 60 seconds idle.
+
+The service's keep-alive timeout must be longer than `connEvictIdleConnectionsInSeconds`. Otherwise the service closes connections the client still considers usable, and requests on them fail. Node.js defaults `server.keepAliveTimeout` to 5 seconds; raise it, e.g. `server.keepAliveTimeout = 65000` and `server.headersTimeout = 66000`.
+
+Both clients use HTTP/1.1 only. HTTP/2 lowercases header names, and the service treats them as case sensitive.
 
 ### Pool Statistics Logging
 
@@ -477,6 +489,90 @@ onException=ignore
 # Header prefix
 headers.prefix=offset-commit-broker-
 ```
+
+---
+
+## Produce Response Listeners
+
+Act on records after the broker has appended them, with the offsets the broker assigned. Requires the Kafka fork's `ProduceResponseListener` hook, which `KafkaApis` calls from the produce response callback, once the records are appended and the request's `acks` is satisfied.
+
+### How it works
+
+1. While parsing a produce request, after all transformers have run, `TransformingProduceRequestParser` stashes each record's key, headers and timestamp in `ProducedRecords`, per partition. Values are stashed only when `records.body=true`. Stashing has to happen at parse time, because the broker clears the request's records after appending them. It only runs when a listener is configured.
+2. When the broker calls the listener, `AbstractProduceResponseListener` pops the stash and gives each record its offset: the partition's `baseOffset` plus the record's position in the batch. Partitions that failed to append are left out. Records are then filtered by `topics.namePattern` and passed to `onAppended`.
+3. `onAppended` runs on a broker thread and must not block. To act on records differently, extend `AbstractProduceResponseListener`.
+
+Enable it on the broker, with a system property or env var:
+```
+-Dorg.apache.kafka.common.requests.ProduceResponseListener=org.apache.kafka.common.requests.transform.HttpProduceResponseListener
+KAFKA_PRODUCE_RESPONSE_LISTENER=org.apache.kafka.common.requests.transform.HttpProduceResponseListener
+```
+
+Listener settings use the name `produce-response-listener` (change it with `KAFKA_PRODUCE_RESPONSE_LISTENER_NAME`). They resolve like any transformer's: `produce-response-listener.properties`, `-Dproduce-response-listener-{key}`, or env `produce_response_listener_{key}`.
+
+### HttpProduceResponseListener
+
+Queues appended records and POSTs them in batches from a background thread, every `batch.intervalMs`, or sooner once `batch.maxRecords` are queued.
+
+| Name | Default | Effect |
+|------|---------|--------|
+| uri | | Service URI; the listener is disabled without it |
+| enable | true | Turn posting on or off |
+| records.headers | | Comma-separated record headers to post, matched case-insensitively |
+| records.mode | all | `all` posts every record. `last-per-partition` posts only each partition's latest record per flush, see below |
+| records.requireHeaders | false | Only post records that have at least one of `records.headers` |
+| records.body | false | Also post each record's value. Values are then kept in memory from parse until the append completes |
+| records.bodyEncoding | utf8 | `utf8` or `base64` |
+| topics.namePattern | | Only post records of matching topics |
+| batch.intervalMs | 1000 | How often queued records are sent |
+| batch.maxRecords | 5000 | Max records per HTTP call; reaching it triggers an early send |
+| queue.maxRecords | 100000 | Max queued records; beyond this, new ones are dropped with a warning |
+| headers.http | | Extra `key=value` HTTP headers |
+| headers.prefix | `produce-response-listener-broker-` | Prefix of the request headers below |
+| httpClient.* | | Shared HTTP client, see [AHC5 HTTP Client Configuration](#ahc5-http-client-configuration) |
+
+**Method:** POST
+
+**Headers:** `Content-Type: application/json`, `{prefix}hostname`, `{prefix}api-type` = `ProduceResponse`, `{prefix}record-count`
+
+**Body:**
+```json
+{
+  "hostname": "broker-1",
+  "partitions": [
+    {"topic": "article.in.djml", "partition": 0, "records": [
+      {"offset": 1000, "timestamp": 1791302400000, "headers": {"content-lake-api-rec-uid": "content-lake:article.in.djml:2026100617_GREEN_01a11242-..."}},
+      {"offset": 1001, "timestamp": 1791302400005, "headers": {}}
+    ]}
+  ]
+}
+```
+
+Only the configured headers that a record has are included, so `headers` can be empty unless `records.requireHeaders=true`. `body` is added when `records.body=true`.
+
+Any response other than 200 is logged with the full request and response, and the batch is dropped.
+
+#### records.mode=last-per-partition
+
+Instead of every record, posts only the record with the highest offset in each partition since the last flush, i.e. at most one record per partition every `batch.intervalMs`, whatever the throughput. `records.requireHeaders` is applied first, so it's the latest record that has the headers. `queue.maxRecords` doesn't apply, since at most one record per partition is held.
+
+Use it when the service only needs reference points, e.g. to place a consumer group: map a committed offset to the nearest posted offset at or below it, and resume after that record. A group rehydrated that way re-reads at most about one interval of records, the usual at-least-once behaviour.
+
+#### Example: link content lake uids to offsets
+
+```properties
+uri=http://streamproc-content-lake-gateway:3000/streamproc-content-lake-gateway/offsets
+records.headers=content-lake-api-rec-uid
+records.requireHeaders=true
+records.body=false
+topics.namePattern=(?i)^(?!__).*$
+```
+
+### Caveats
+
+- Records still queued when a broker stops are lost.
+- If an idempotent producer retries a batch that was already written, the broker reports the original offsets for the retry. A service keyed by offset should keep the first record it receives for an offset.
+- "Appended" means written to the log and replicated as `acks` requires, not fsynced. Kafka doesn't fsync each write.
 
 ---
 
