@@ -114,6 +114,8 @@ public class LineageProduceRequestDataInterceptorTest {
         for (String name : List.of("in-time", "out-time", "run-timespan")) {
             assertTrue(name, null != header(out, interceptor.headerPrefix + name));
         }
+        long runTime = Long.parseLong(header(out, interceptor.headerPrefix + "run-timespan"));
+        assertTrue("run-timespan " + runTime + " is negative", runTime >= 0);
     }
 
     @Test

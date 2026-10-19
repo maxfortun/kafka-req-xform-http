@@ -136,7 +136,7 @@ public class LineageProduceRequestDataTransformer extends AbstractProduceRequest
         updateLineageMap(lineage, true);
 
         LocalDateTime outDateTime = LocalDateTime.now();
-        long runTime = Duration.between(outDateTime, inDateTime).toMillis();
+        long runTime = Duration.between(inDateTime, outDateTime).toMillis();
 
         if(configured("in-headers", "time", false)) {
             setHeader(recordHeaders, headerPrefix+"in-time", formatDateTime(inDateTime, recordHeaders));
