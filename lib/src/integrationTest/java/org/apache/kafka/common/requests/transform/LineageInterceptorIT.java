@@ -2,77 +2,27 @@ package org.apache.kafka.common.requests.transform;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.kafka.clients.admin.Admin;
-import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestName;
-import org.junit.rules.TestWatcher;
-import org.junit.runner.Description;
 
-/**
- * Runs against a real broker with the produce request interceptor chain set to lineage only
- * (resources/docker/config), with lineage prefix "/it:" and in-time enabled.
- */
-public class LineageInterceptorIT {
-    private static XformKafkaContainer kafka;
-    private static Admin admin;
-
-    @Rule
-    public TestName testName = new TestName();
-
-    @Rule
-    public TestWatcher brokerLogsOnFailure = new TestWatcher() {
-        @Override
-        protected void failed(Throwable e, Description description) {
-            System.err.println("Broker logs for " + description + ":\n" + kafka.getLogs());
-        }
-    };
-
-    @BeforeClass
-    public static void startBroker() {
-        kafka = new XformKafkaContainer();
-        kafka.start();
-        admin = Admin.create(Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers()));
-    }
-
-    @AfterClass
-    public static void stopBroker() {
-        if (null != admin) {
-            admin.close();
-        }
-        if (null != kafka) {
-            kafka.stop();
-        }
-    }
+// lineage.properties sets prefix "/it:" with in-time enabled.
+public class LineageInterceptorIT extends XformKafkaIT {
 
     @Test
     public void addsLineageHeader() throws Exception {
@@ -159,7 +109,8 @@ public class LineageInterceptorIT {
         }
 
         List<ConsumerRecord<String, String>> committed = consumeAll(topic, "read_committed");
-        assertEquals(List.of("committed-0", "committed-1", "committed-2"), values(committed));
+        assertEquals(List.of("committed-0", "committed-1", "committed-2"),
+            committed.stream().map(ConsumerRecord::value).collect(Collectors.toList()));
         for (ConsumerRecord<String, String> record : committed) {
             assertLineage("/it:" + Pattern.quote(topic) + ":\\d+", record);
         }
@@ -167,58 +118,9 @@ public class LineageInterceptorIT {
         assertEquals(6, consumeAll(topic, "read_uncommitted").size());
     }
 
-    private String createTopic() throws Exception {
-        String topic = "it-" + testName.getMethodName();
-        admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1))).all().get(30, SECONDS);
-        return topic;
-    }
-
-    private static KafkaProducer<String, String> producer(Map<String, Object> overrides) {
-        Map<String, Object> props = new HashMap<>();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 10000);
-        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 30000);
-        props.putAll(overrides);
-        return new KafkaProducer<>(props);
-    }
-
-    // Reads partition 0 up to its end offset, which for read_committed is the last stable offset.
-    private static List<ConsumerRecord<String, String>> consumeAll(String topic, String isolationLevel) {
-        Map<String, Object> props = new HashMap<>();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-        props.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, isolationLevel);
-
-        TopicPartition partition = new TopicPartition(topic, 0);
-        List<ConsumerRecord<String, String>> records = new ArrayList<>();
-        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
-            consumer.assign(List.of(partition));
-            consumer.seekToBeginning(List.of(partition));
-            long end = consumer.endOffsets(List.of(partition)).get(partition);
-            long deadline = System.currentTimeMillis() + 30_000;
-            while (consumer.position(partition) < end) {
-                if (System.currentTimeMillis() > deadline) {
-                    throw new AssertionError("Timed out reading " + partition + " up to offset " + end + ", got " + records.size() + " records");
-                }
-                consumer.poll(Duration.ofMillis(500)).forEach(records::add);
-            }
-        }
-        return records;
-    }
-
     private static void assertLineage(String expectedRegex, ConsumerRecord<String, String> record) {
-        Header header = record.headers().lastHeader("lineage");
-        assertNotNull("lineage header missing at offset " + record.offset(), header);
-        String lineage = new String(header.value(), StandardCharsets.UTF_8);
+        String lineage = lineage(record);
         assertTrue("lineage '" + lineage + "' does not match " + expectedRegex, Pattern.matches(expectedRegex, lineage));
-    }
-
-    private static List<String> values(List<ConsumerRecord<String, String>> records) {
-        return records.stream().map(ConsumerRecord::value).collect(Collectors.toList());
     }
 
     private static int count(Iterable<Header> headers) {

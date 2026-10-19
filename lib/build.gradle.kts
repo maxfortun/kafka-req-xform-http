@@ -61,6 +61,7 @@ testing {
             dependencies {
                 implementation("org.apache.kafka:kafka-clients:${kafkaVersion}")
                 implementation("org.testcontainers:testcontainers:2.0.5")
+                implementation("org.json:json:20250107")
                 runtimeOnly("org.slf4j:slf4j-simple:1.7.36")
             }
 

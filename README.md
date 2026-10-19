@@ -15,8 +15,9 @@ KAFKA_VERSION=4.0.0-SNAPSHOT ./gradlew jar
 ### Integration Tests
 `integrationTest` runs a single-node broker in Docker and produces/consumes against it. The image is the stock
 `apache/kafka:<x.y.z>` image with the fork's `kafka-clients` and `kafka_2.13` jars for `KAFKA_VERSION` swapped in from
-`~/.m2` (install the fork first), plus this plugin with the produce request interceptor chain set to `lineage`.
-Requires Docker; not part of `check`.
+`~/.m2` (install the fork first), plus this plugin with the production interceptor chains: pre-write
+`lineage,content-lake` (content-lake disabled) and post-write `content-lake-offsets`, which posts offsets to a stub
+lake in the test JVM. Requires Docker; not part of `check`.
 ```
 KAFKA_VERSION=3.7.2-MAX11 ./gradlew integrationTest
 ```

@@ -13,5 +13,6 @@ USER appuser
 # Interceptor properties are loaded as ResourceBundles, so their directory must be on the classpath.
 ENV CLASSPATH=/opt/xform/config
 ENV KAFKA_PRODUCE_REQUEST_INTERCEPTOR=org.apache.kafka.common.requests.transform.TransformingProduceRequestInterceptor
+ENV KAFKA_PRODUCE_RESPONSE_INTERCEPTOR=org.apache.kafka.common.requests.transform.TransformingProduceResponseInterceptor
 
 ENTRYPOINT ["bash", "/opt/xform/entrypoint.sh"]

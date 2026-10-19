@@ -23,6 +23,11 @@ public class XformKafkaContainer extends GenericContainer<XformKafkaContainer> {
         waitingFor(Wait.forLogMessage(".*Kafka Server started.*", 1).withStartupTimeout(Duration.ofMinutes(2)));
     }
 
+    // appConfig reads <transformerName>-<key> system properties before the properties files.
+    public XformKafkaContainer withOffsetsUri(String uri) {
+        return withEnv("KAFKA_OPTS", "-Dcontent-lake-offsets-offsets.uri=" + uri);
+    }
+
     public String getBootstrapServers() {
         return getHost() + ":" + getMappedPort(PUBLIC_PORT);
     }
@@ -39,8 +44,7 @@ public class XformKafkaContainer extends GenericContainer<XformKafkaContainer> {
             .withFileFromClasspath("Dockerfile", "docker/Dockerfile")
             .withFileFromClasspath("entrypoint.sh", "docker/entrypoint.sh")
             .withFileFromClasspath("server.properties", "docker/server.properties")
-            .withFileFromClasspath("config/lineage.properties", "docker/config/lineage.properties")
-            .withFileFromClasspath("config/TransformingProduceRequestInterceptor.properties", "docker/config/TransformingProduceRequestInterceptor.properties");
+            .withFileFromClasspath("config", "docker/config");
         addLibs(image, "broker-libs", required("xform.brokerLibs"));
         addLibs(image, "plugin-libs", required("xform.pluginLibs"));
         return image;
