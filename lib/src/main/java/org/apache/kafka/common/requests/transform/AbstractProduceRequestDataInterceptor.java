@@ -18,7 +18,9 @@ package org.apache.kafka.common.requests.transform;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.kafka.common.TopicPartition;
@@ -62,6 +64,9 @@ public abstract class AbstractProduceRequestDataInterceptor extends AbstractTran
         Map<String, Map<Integer, MemoryRecordsBuilder>> dlqBuilders = new HashMap<>();
         String dlqTopicHeader = headerPrefix + "dlq-topic";
 
+        // Stash for post-write interceptor
+        Map<TopicPartition, InterceptorStash.StashedPartition> stashedPartitions = new HashMap<>();
+
         for (RawTaggedField rawTaggedField : produceRequestDataOut.unknownTaggedFields()) {
             log.debug("{}: rawTaggedField {} = {}", transformerName, rawTaggedField.tag(), Utils.utf8(rawTaggedField.data()));
         }
@@ -77,7 +82,12 @@ public abstract class AbstractProduceRequestDataInterceptor extends AbstractTran
                 TopicPartition topicPartition = new TopicPartition(topicProduceData.name(), partitionProduceData.index());
 
                 try {
-                    interceptPartition(topicProduceData, partitionProduceData, dlqBuilders, dlqTopicHeader, version);
+                    List<InterceptorStash.StashedRecord> stashedRecords = interceptPartition(
+                        topicProduceData, partitionProduceData, dlqBuilders, dlqTopicHeader, version);
+                    if (stashedRecords != null && !stashedRecords.isEmpty()) {
+                        stashedPartitions.put(topicPartition,
+                            new InterceptorStash.StashedPartition(topicPartition, stashedRecords));
+                    }
                 } catch (PartitionErrorException e) {
                     log.warn("{}: partition {} failed with {}: {}", transformerName, topicPartition, e.error(), e.getMessage());
                     partitionErrors.put(topicPartition, e.error());
@@ -107,10 +117,15 @@ public abstract class AbstractProduceRequestDataInterceptor extends AbstractTran
             produceRequestDataOut.topicData().add(dlqTopicData);
         }
 
+        // Stash data for post-write interceptor
+        if (!stashedPartitions.isEmpty()) {
+            InterceptorStash.stash(produceRequestDataOut, new InterceptorStash.StashedRequest(stashedPartitions));
+        }
+
         return new InterceptResult(produceRequestDataOut, partitionErrors);
     }
 
-    private void interceptPartition(
+    private List<InterceptorStash.StashedRecord> interceptPartition(
         ProduceRequestData.TopicProduceData topicProduceData,
         ProduceRequestData.PartitionProduceData partitionProduceData,
         Map<String, Map<Integer, MemoryRecordsBuilder>> dlqBuilders,
@@ -119,6 +134,7 @@ public abstract class AbstractProduceRequestDataInterceptor extends AbstractTran
     ) throws Exception {
         MemoryRecords memoryRecords = (MemoryRecords) partitionProduceData.records();
         ByteBufferOutputStream recordsOut = new ByteBufferOutputStream(memoryRecords.sizeInBytes());
+        List<InterceptorStash.StashedRecord> stashedRecords = new ArrayList<>();
 
         int batchId = 0;
         for (MutableRecordBatch recordBatch : memoryRecords.batches()) {
@@ -143,6 +159,26 @@ public abstract class AbstractProduceRequestDataInterceptor extends AbstractTran
                     recordHeaders,
                     version
                 );
+
+                // Stash record data for post-write interceptor
+                Map<String, String> headerMap = new HashMap<>();
+                for (Header h : transformedRecord.headers()) {
+                    headerMap.put(h.key(), Utils.utf8(h.value()));
+                }
+                byte[] valueBytes = null;
+                if (shouldStashValue()) {
+                    ByteBuffer valueBuf = transformedRecord.value();
+                    if (valueBuf != null) {
+                        valueBytes = new byte[valueBuf.remaining()];
+                        valueBuf.duplicate().get(valueBytes);
+                    }
+                }
+                stashedRecords.add(new InterceptorStash.StashedRecord(
+                    Utils.utf8(transformedRecord.key()),
+                    transformedRecord.timestamp(),
+                    headerMap,
+                    valueBytes
+                ));
 
                 // Check if record should be routed to DLQ
                 String dlqTopic = getDlqTopic(transformedRecord, dlqTopicHeader);
@@ -173,6 +209,15 @@ public abstract class AbstractProduceRequestDataInterceptor extends AbstractTran
         ByteBuffer recordsBuffer = recordsOut.buffer();
         recordsBuffer.flip();
         partitionProduceData.setRecords(MemoryRecords.readableRecords(recordsBuffer));
+        return stashedRecords;
+    }
+
+    /**
+     * Override to return true if record values should be stashed for the post-write interceptor.
+     * Default is false to save memory.
+     */
+    protected boolean shouldStashValue() {
+        return false;
     }
 
     private String getDlqTopic(Record record, String dlqTopicHeader) {
