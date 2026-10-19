@@ -50,12 +50,31 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 	private final String envHeadersPattern;
 	private final String logKeyHeaderName;
 
+	// Retry tracking: route to DLQ after N failed attempts for the same transaction ID
+	private final String retryTxnIdHeader;
+	private final int retryMaxAttempts;
+	private final RetryTracker retryTracker;
+
 	public HttpProduceRequestDataTransformer(String transformerName) throws Exception {
 		super(transformerName);
 
 		persistentHeadersPattern = appConfig("headers.persistentPattern");
 		envHeadersPattern = appConfig("headers.envPattern");
 		logKeyHeaderName = appConfig("headers.logKey");
+
+		// Retry tracking config
+		retryTxnIdHeader = appConfig("retry.txnIdHeader");
+		if (null != retryTxnIdHeader && !retryTxnIdHeader.isBlank()) {
+			retryMaxAttempts = Integer.parseInt(appConfig("retry.maxAttempts", "3"));
+			long retryTtlMs = Long.parseLong(appConfig("retry.ttlMs", "120000"));
+			int retryMaxEntries = Integer.parseInt(appConfig("retry.maxEntries", "100000"));
+			long cleanupIntervalMs = Long.parseLong(appConfig("retry.cleanupIntervalMs", "10000"));
+			retryTracker = new RetryTracker(transformerName, retryTtlMs, retryMaxEntries, cleanupIntervalMs);
+			log.info("{}: retry tracking enabled, txnIdHeader={}, maxAttempts={}", transformerName, retryTxnIdHeader, retryMaxAttempts);
+		} else {
+			retryMaxAttempts = 0;
+			retryTracker = null;
+		}
 	}
 
 	protected Record transform(
@@ -87,6 +106,14 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 			long runTime = outDate.getTime() - inDate.getTime();
 
 			log.info("{}: ok {} {} {} {} {}", transformerName, topicProduceData.name(), partitionProduceData.index(), record.offset(), logKey, runTime);
+
+			// Clear retry tracking on success
+			if (null != retryTracker) {
+				String txnId = getTxnId(recordHeaders);
+				if (null != txnId) {
+					retryTracker.clear(txnId);
+				}
+			}
 
 			return transformed;
 		} catch(Exception e) {
@@ -134,9 +161,63 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 				}
 			}
 
+			// Retry tracking: if enabled and transaction ID is present, check attempt count
+			if (null != retryTracker) {
+				String txnId = getTxnId(recordHeaders);
+				if (null != txnId) {
+					int attempts = retryTracker.recordFailure(txnId);
+					if (attempts >= retryMaxAttempts) {
+						log.warn("{}: retry limit reached ({}/{}), routing to DLQ for txnId={}",
+							transformerName, attempts, retryMaxAttempts, txnId);
+						try {
+							retryTracker.clear(txnId);
+							addErrorHeaders(recordHeaders, e);
+							recordHeaders.remove(headerPrefix + "retry-attempts");
+							recordHeaders.add(headerPrefix + "retry-attempts", String.valueOf(attempts).getBytes(StandardCharsets.UTF_8));
+
+							String dlqTopic = reqConfig(recordHeaders, "onException.dlqTopic");
+							if (dlqTopic == null || dlqTopic.isEmpty()) {
+								dlqTopic = "__{topic-name}-dlq";
+							}
+							dlqTopic = dlqTopic.replace("{topic-name}", topicProduceData.name());
+
+							recordHeaders.remove(headerPrefix + "dlq-topic");
+							recordHeaders.add(headerPrefix + "dlq-topic", dlqTopic.getBytes(StandardCharsets.UTF_8));
+							recordHeaders.remove(headerPrefix + "original-topic");
+							recordHeaders.add(headerPrefix + "original-topic", topicProduceData.name().getBytes(StandardCharsets.UTF_8));
+							log.info("{}: routing to DLQ topic {} after {} attempts for txnId={}",
+								transformerName, dlqTopic, attempts, txnId);
+							return newRecord(recordBatch, record, recordHeaders.toArray(), record.value());
+						} catch (Exception innerEx) {
+							log.error("{}: failed to create DLQ record for retry limit", transformerName, innerEx);
+							throw new InvalidRequestException(transformerName, e);
+						}
+					} else {
+						log.info("{}: attempt {}/{} for txnId={}, will retry",
+							transformerName, attempts, retryMaxAttempts, txnId);
+					}
+				}
+			}
+
 			// Default behavior: throw
 			throw new InvalidRequestException(transformerName, e);
 		}
+	}
+
+	private String getTxnId(RecordHeaders recordHeaders) {
+		if (null == retryTxnIdHeader) {
+			return null;
+		}
+		Header header = recordHeaders.lastHeader(retryTxnIdHeader);
+		if (null == header) {
+			// Try case-insensitive match
+			for (Header h : recordHeaders) {
+				if (retryTxnIdHeader.equalsIgnoreCase(h.key())) {
+					header = h;
+				}
+			}
+		}
+		return null == header ? null : Utils.utf8(header.value());
 	}
 
 	private String findOriginalHeaderName(Header[] headers, String headerName) {

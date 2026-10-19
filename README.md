@@ -62,6 +62,24 @@ When `onException=dlq`, additionally:
 - Record is routed to the DLQ topic instead of the original topic
 - DLQ topic defaults to `{originalTopic}-dlq`, configurable via `onException.dlqTopic`
 
+### Retry Tracking
+
+When a record has a transaction ID header and `onException` would throw (causing the producer to retry), the plugin can track how many times that transaction ID has failed. After reaching `retry.maxAttempts`, the record is routed to the DLQ instead of throwing again.
+
+| Name | Default | Effect |
+|------|---------|--------|
+| `retry.txnIdHeader` | (none) | Header name for transaction ID, e.g. `cl-api-txn-id`. Retry tracking is disabled without it |
+| `retry.maxAttempts` | 3 | Route to DLQ after this many failed attempts |
+| `retry.ttlMs` | 120000 | How long to remember a failed transaction ID (should match producer's `delivery.timeout.ms`) |
+| `retry.maxEntries` | 100000 | Max tracked transaction IDs (bounded to prevent OOM under sustained failures) |
+| `retry.cleanupIntervalMs` | 10000 | How often expired entries are cleaned up |
+
+When a record is routed to DLQ due to retry limit:
+- `{headerPrefix}retry-attempts` = the number of attempts made
+- All standard error headers are also added (`{headerPrefix}error`, `{headerPrefix}error-class`, `{headerPrefix}error-message`)
+
+This is useful when transient failures (network timeouts, port exhaustion, service unavailability) cause repeated retries. Instead of retrying indefinitely, the record goes to the DLQ where it can be inspected and reprocessed later.
+
 ### Sample config
 ```
 enable=true
