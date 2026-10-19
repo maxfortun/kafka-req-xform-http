@@ -17,9 +17,13 @@ plugins {
 }
 
 repositories {
-    // Use Maven Central for resolving dependencies.
+	// The fork may be installed under an upstream release version (e.g. 3.7.2), so the local build must win for Kafka.
+	mavenLocal {
+		content {
+			includeGroup("org.apache.kafka")
+		}
+	}
     mavenCentral()
-	mavenLocal()
 }
 
 val kafkaVersion: String = System.getenv("KAFKA_VERSION") ?: ""
