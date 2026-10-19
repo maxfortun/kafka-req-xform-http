@@ -160,25 +160,26 @@ public abstract class AbstractProduceRequestDataInterceptor extends AbstractTran
                     version
                 );
 
-                // Stash record data for post-write interceptor
-                Map<String, String> headerMap = new HashMap<>();
-                for (Header h : transformedRecord.headers()) {
-                    headerMap.put(h.key(), Utils.utf8(h.value()));
-                }
-                byte[] valueBytes = null;
-                if (shouldStashValue()) {
-                    ByteBuffer valueBuf = transformedRecord.value();
-                    if (valueBuf != null) {
-                        valueBytes = new byte[valueBuf.remaining()];
-                        valueBuf.duplicate().get(valueBytes);
+                if (shouldStash()) {
+                    Map<String, String> headerMap = new HashMap<>();
+                    for (Header h : transformedRecord.headers()) {
+                        headerMap.put(h.key(), Utils.utf8(h.value()));
                     }
+                    byte[] valueBytes = null;
+                    if (shouldStashValue()) {
+                        ByteBuffer valueBuf = transformedRecord.value();
+                        if (valueBuf != null) {
+                            valueBytes = new byte[valueBuf.remaining()];
+                            valueBuf.duplicate().get(valueBytes);
+                        }
+                    }
+                    stashedRecords.add(new InterceptorStash.StashedRecord(
+                        Utils.utf8(transformedRecord.key()),
+                        transformedRecord.timestamp(),
+                        headerMap,
+                        valueBytes
+                    ));
                 }
-                stashedRecords.add(new InterceptorStash.StashedRecord(
-                    Utils.utf8(transformedRecord.key()),
-                    transformedRecord.timestamp(),
-                    headerMap,
-                    valueBytes
-                ));
 
                 // Check if record should be routed to DLQ
                 String dlqTopic = getDlqTopic(transformedRecord, dlqTopicHeader);
@@ -210,6 +211,11 @@ public abstract class AbstractProduceRequestDataInterceptor extends AbstractTran
         recordsBuffer.flip();
         partitionProduceData.setRecords(MemoryRecords.readableRecords(recordsBuffer));
         return stashedRecords;
+    }
+
+    // The stash is keyed by this interceptor's output, so only the last interceptor in a chain should stash.
+    protected boolean shouldStash() {
+        return true;
     }
 
     /**
