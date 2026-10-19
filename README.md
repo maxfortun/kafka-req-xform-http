@@ -12,6 +12,17 @@ or
 KAFKA_VERSION=4.0.0-SNAPSHOT ./gradlew jar
 ```
 
+### Integration Tests
+`integrationTest` runs a single-node broker in Docker and produces/consumes against it. The image is the stock
+`apache/kafka:<x.y.z>` image with the fork's `kafka-clients` and `kafka_2.13` jars for `KAFKA_VERSION` swapped in from
+`~/.m2` (install the fork first), plus this plugin with the produce request interceptor chain set to `lineage`.
+Requires Docker; not part of `check`.
+```
+KAFKA_VERSION=3.7.2-MAX11 ./gradlew integrationTest
+```
+Override the base image with `-PkafkaBaseImage=apache/kafka:3.7.2`. The image's files are in
+`lib/src/integrationTest/resources/docker`. Broker logs are printed when a test fails.
+
 ### Request Headers
 All headers have a prefix of `plugin prefix`-`broker`-, configurable with `headers.prefix`.
 

@@ -22,6 +22,13 @@ repositories {
 	mavenLocal()
 }
 
+val kafkaVersion: String = System.getenv("KAFKA_VERSION") ?: ""
+
+// The fork's broker jars, swapped into the stock Kafka image used by the integration tests.
+val brokerOverlay by configurations.creating {
+	isTransitive = false
+}
+
 dependencies {
     // This dependency is exported to consumers, that is to say found on their compile classpath.
     api(libs.commons.math3)
@@ -29,7 +36,10 @@ dependencies {
     // This dependency is used internally, and not exposed to consumers on their own compile classpath.
     implementation(libs.guava)
 
-	implementation("org.apache.kafka:kafka-clients:${System.getenv("KAFKA_VERSION")}")
+	implementation("org.apache.kafka:kafka-clients:${kafkaVersion}")
+
+	brokerOverlay("org.apache.kafka:kafka_2.13:${kafkaVersion}")
+	brokerOverlay("org.apache.kafka:kafka-clients:${kafkaVersion}")
 	implementation("org.slf4j:slf4j-api:1.7.36")
 	implementation("org.slf4j:jul-to-slf4j:1.7.36")
 	implementation("org.apache.httpcomponents.client5:httpclient5:5.4")
@@ -42,6 +52,41 @@ testing {
         val test by getting(JvmTestSuite::class) {
             // Use JUnit4 test framework
             useJUnit("4.13.2")
+        }
+
+        // Runs a broker built from the fork's jars with this plugin in Docker: ./gradlew integrationTest
+        val integrationTest by registering(JvmTestSuite::class) {
+            useJUnit("4.13.2")
+
+            dependencies {
+                implementation("org.apache.kafka:kafka-clients:${kafkaVersion}")
+                implementation("org.testcontainers:testcontainers:2.0.5")
+                runtimeOnly("org.slf4j:slf4j-simple:1.7.36")
+            }
+
+            targets {
+                all {
+                    testTask.configure {
+                        val pluginJar = tasks.jar.flatMap { it.archiveFile }
+                        val pluginRuntime = configurations.runtimeClasspath
+                        inputs.files(pluginJar, pluginRuntime, brokerOverlay)
+                        shouldRunAfter(tasks.named("test"))
+
+                        doFirst {
+                            // The broker already ships these, at the versions in brokerOverlay.
+                            val pluginLibs = listOf(pluginJar.get().asFile) + pluginRuntime.get().files.filterNot {
+                                it.name.startsWith("kafka-clients-") || it.name.startsWith("slf4j-api-")
+                            }
+                            val baseVersion = Regex("""^\d+\.\d+\.\d+""").find(kafkaVersion)?.value
+                                ?: throw GradleException("KAFKA_VERSION must start with x.y.z, got '${kafkaVersion}'")
+
+                            systemProperty("xform.pluginLibs", pluginLibs.joinToString(File.pathSeparator))
+                            systemProperty("xform.brokerLibs", brokerOverlay.files.joinToString(File.pathSeparator))
+                            systemProperty("xform.kafkaBaseImage", findProperty("kafkaBaseImage") ?: "apache/kafka:${baseVersion}")
+                        }
+                    }
+                }
+            }
         }
     }
 }
