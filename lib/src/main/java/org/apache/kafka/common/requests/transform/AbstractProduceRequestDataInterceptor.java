@@ -82,9 +82,13 @@ public abstract class AbstractProduceRequestDataInterceptor extends AbstractTran
                 TopicPartition topicPartition = new TopicPartition(topicProduceData.name(), partitionProduceData.index());
 
                 try {
+                    boolean hadRecords = partitionProduceData.records().sizeInBytes() > 0;
                     List<InterceptorStash.StashedRecord> stashedRecords = interceptPartition(
                         topicProduceData, partitionProduceData, dlqBuilders, dlqTopicHeader, version);
-                    if (stashedRecords != null && !stashedRecords.isEmpty()) {
+                    if (hadRecords && partitionProduceData.records().sizeInBytes() == 0) {
+                        // Every record went to the DLQ. The broker rejects a partition with no batch, so report it done without a write.
+                        partitionErrors.put(topicPartition, Errors.NONE);
+                    } else if (stashedRecords != null && !stashedRecords.isEmpty()) {
                         stashedPartitions.put(topicPartition,
                             new InterceptorStash.StashedPartition(topicPartition, stashedRecords));
                     }

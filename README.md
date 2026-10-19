@@ -16,11 +16,13 @@ KAFKA_VERSION=4.0.0-SNAPSHOT ./gradlew jar
 `integrationTest` runs a single-node broker in Docker and produces/consumes against it. The image is the stock
 `apache/kafka:<x.y.z>` image with the fork's `kafka-clients` and `kafka_2.13` jars for `KAFKA_VERSION` swapped in from
 `~/.m2` (install the fork first), plus this plugin with the production interceptor chains: pre-write
-`lineage,content-lake` (content-lake disabled) and post-write `content-lake-offsets`, which posts offsets to a stub
-lake in the test JVM. Requires Docker; not part of `check`.
+`lineage,content-lake` and post-write `content-lake-offsets`. Both call a stub lake in the test JVM. Content-lake is
+off unless a record sets `content-lake-broker-enable=true`, and records steer the stub with `it-lake-fail`
+(`always`, or fail the first N calls). Requires Docker; not part of `check`.
 ```
-KAFKA_VERSION=3.7.2-MAX11 ./gradlew integrationTest
+KAFKA_VERSION=3.7.2-MAX12 ./gradlew integrationTest
 ```
+DLQ routing needs a fork build that only answers for the partitions a client sent (3.7.2-MAX12 or later).
 Override the base image with `-PkafkaBaseImage=apache/kafka:3.7.2`. The image's files are in
 `lib/src/integrationTest/resources/docker`. Broker logs are printed when a test fails.
 

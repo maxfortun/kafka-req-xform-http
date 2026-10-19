@@ -23,9 +23,12 @@ public class XformKafkaContainer extends GenericContainer<XformKafkaContainer> {
         waitingFor(Wait.forLogMessage(".*Kafka Server started.*", 1).withStartupTimeout(Duration.ofMinutes(2)));
     }
 
+    private final StringBuilder kafkaOpts = new StringBuilder();
+
     // appConfig reads <transformerName>-<key> system properties before the properties files.
-    public XformKafkaContainer withOffsetsUri(String uri) {
-        return withEnv("KAFKA_OPTS", "-Dcontent-lake-offsets-offsets.uri=" + uri);
+    public XformKafkaContainer withTransformerConfig(String transformerName, String key, String value) {
+        kafkaOpts.append(" -D").append(transformerName).append('-').append(key).append('=').append(value);
+        return withEnv("KAFKA_OPTS", kafkaOpts.toString().trim());
     }
 
     public String getBootstrapServers() {

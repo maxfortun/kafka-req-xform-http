@@ -27,8 +27,9 @@ public class LineageInterceptorIT extends XformKafkaIT {
     @Test
     public void addsLineageHeader() throws Exception {
         String topic = createTopic();
+        long timestamp = 1_700_000_000_123L;
         try (KafkaProducer<String, String> producer = producer(Map.of())) {
-            producer.send(new ProducerRecord<>(topic, "k1", "v1")).get(30, SECONDS);
+            producer.send(new ProducerRecord<>(topic, null, timestamp, "k1", "v1")).get(30, SECONDS);
         }
 
         List<ConsumerRecord<String, String>> records = consumeAll(topic, "read_uncommitted");
@@ -37,6 +38,7 @@ public class LineageInterceptorIT extends XformKafkaIT {
         ConsumerRecord<String, String> record = records.get(0);
         assertEquals("k1", record.key());
         assertEquals("v1", record.value());
+        assertEquals("the producer's timestamp is kept", timestamp, record.timestamp());
         assertLineage("/it:" + Pattern.quote(topic) + ":\\d+", record);
     }
 

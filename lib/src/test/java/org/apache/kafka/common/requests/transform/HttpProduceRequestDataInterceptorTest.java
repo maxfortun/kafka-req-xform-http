@@ -80,6 +80,11 @@ public class HttpProduceRequestDataInterceptorTest {
         return null;
     }
 
+    // Errors.NONE marks a partition the interceptor finished without a write, e.g. all records sent to the DLQ.
+    private static boolean failed(InterceptResult result) {
+        return result.partitionErrors().values().stream().anyMatch(error -> Errors.NONE != error);
+    }
+
     private void lakeFails() {
         lake.respond(request -> new StubHttpServer.Response(500, "lake is down"));
     }
@@ -88,7 +93,7 @@ public class HttpProduceRequestDataInterceptorTest {
     public void replacesRecordWithLakeResponse() throws Exception {
         InterceptResult result = send(interceptor(), plain(record("k0", "v0")));
 
-        assertFalse(result.hasErrors());
+        assertFalse(failed(result));
         Record out = only(result);
         assertEquals("lake:v0", value(out));
         assertEquals("k0", key(out));
@@ -234,7 +239,7 @@ public class HttpProduceRequestDataInterceptorTest {
 
         InterceptResult result = send(interceptor(), plain(record("k0", "v0", "uid", "u0")));
 
-        assertFalse(result.hasErrors());
+        assertFalse(failed(result));
         Record out = only(result);
         assertEquals("v0", value(out));
         assertEquals("u0", header(out, "uid"));
@@ -248,7 +253,7 @@ public class HttpProduceRequestDataInterceptorTest {
 
         InterceptResult result = send(interceptor, plain(record("k0", "v0")));
 
-        assertFalse(result.hasErrors());
+        assertFalse(failed(result));
         Record out = only(result);
         assertEquals("v0", value(out));
         assertEquals("true", header(out, interceptor.headerPrefix + "error"));
@@ -264,7 +269,7 @@ public class HttpProduceRequestDataInterceptorTest {
 
         InterceptResult result = send(interceptor, plain(record("k0", "v0", interceptor.headerPrefix + "onException", "original")));
 
-        assertFalse(result.hasErrors());
+        assertFalse(failed(result));
         assertEquals("v0", value(only(result)));
     }
 
@@ -276,8 +281,8 @@ public class HttpProduceRequestDataInterceptorTest {
 
         InterceptResult result = send(interceptor, plain(record("k0", "v0")));
 
-        assertFalse(result.hasErrors());
-        assertEquals(0, recordList(records(result.data(), topic, 0)).size());
+        assertFalse(failed(result));
+        assertEquals("done without a write", Errors.NONE, result.partitionErrors().get(new TopicPartition(topic, 0)));
         List<Record> dlq = recordList(records(result.data(), "__" + topic + "-dlq", 0));
         assertEquals(1, dlq.size());
         assertEquals("v0", value(dlq.get(0)));
@@ -302,11 +307,11 @@ public class HttpProduceRequestDataInterceptorTest {
         HttpProduceRequestDataInterceptor interceptor = interceptor();
         MemoryRecords records = idempotent(record("k0", "v0", "cl-api-txn-id", "tx-1"));
 
-        assertTrue(send(interceptor, records).hasErrors());
-        assertTrue(send(interceptor, records).hasErrors());
+        assertTrue(failed(send(interceptor, records)));
+        assertTrue(failed(send(interceptor, records)));
         InterceptResult third = send(interceptor, records);
 
-        assertFalse("third attempt goes to the DLQ instead of failing", third.hasErrors());
+        assertFalse("third attempt goes to the DLQ instead of failing", failed(third));
         List<Record> dlq = recordList(records(third.data(), "__" + topic + "-dlq", 0));
         assertEquals(1, dlq.size());
         assertEquals("3", header(dlq.get(0), interceptor.headerPrefix + "retry-attempts"));
@@ -320,8 +325,8 @@ public class HttpProduceRequestDataInterceptorTest {
         HttpProduceRequestDataInterceptor interceptor = interceptor();
         MemoryRecords records = plain(record("k0", "v0", "CL-API-TXN-ID", "tx-1"));
 
-        assertTrue(send(interceptor, records).hasErrors());
-        assertFalse(send(interceptor, records).hasErrors());
+        assertTrue(failed(send(interceptor, records)));
+        assertFalse(failed(send(interceptor, records)));
     }
 
     @Test
@@ -331,13 +336,13 @@ public class HttpProduceRequestDataInterceptorTest {
         MemoryRecords records = plain(record("k0", "v0", "cl-api-txn-id", "tx-1"));
 
         lakeFails();
-        assertTrue(send(interceptor, records).hasErrors());
+        assertTrue(failed(send(interceptor, records)));
         lake.respond(request -> new StubHttpServer.Response(200, "ok"));
-        assertFalse(send(interceptor, records).hasErrors());
+        assertFalse(failed(send(interceptor, records)));
         lakeFails();
         InterceptResult afterReset = send(interceptor, records);
 
-        assertTrue("count restarted at 1, so this is an error, not a DLQ route", afterReset.hasErrors());
+        assertTrue("count restarted at 1, so this is an error, not a DLQ route", failed(afterReset));
     }
 
     @Test
@@ -348,7 +353,7 @@ public class HttpProduceRequestDataInterceptorTest {
         MemoryRecords records = plain(record("k0", "v0"));
 
         for (int i = 0; i < 4; i++) {
-            assertTrue(send(interceptor, records).hasErrors());
+            assertTrue(failed(send(interceptor, records)));
         }
     }
 
@@ -359,7 +364,7 @@ public class HttpProduceRequestDataInterceptorTest {
 
         InterceptResult result = send(interceptor(), plain(record("k0", "v0")));
 
-        assertFalse(result.hasErrors());
+        assertFalse(failed(result));
         assertEquals("v0", value(only(result)));
     }
 
@@ -370,7 +375,7 @@ public class HttpProduceRequestDataInterceptorTest {
 
         InterceptResult result = send(interceptor(), plain(record("k0", "v0")));
 
-        assertFalse(result.hasErrors());
+        assertFalse(failed(result));
         assertEquals("partial", value(only(result)));
     }
 

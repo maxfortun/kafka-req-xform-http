@@ -33,12 +33,12 @@ import org.junit.runner.Description;
 import org.testcontainers.Testcontainers;
 
 /**
- * Broker with the interceptor chains from resources/docker/config: pre-write lineage,content-lake (content-lake disabled),
- * post-write content-lake-offsets posting to an OffsetsLake in this JVM.
+ * Broker with the interceptor chains from resources/docker/config: pre-write lineage,content-lake (content-lake off unless a
+ * record turns it on), post-write content-lake-offsets. Both call a StubLake in this JVM.
  */
 public abstract class XformKafkaIT {
     protected static XformKafkaContainer kafka;
-    protected static OffsetsLake lake;
+    protected static StubLake lake;
     protected static Admin admin;
 
     @Rule
@@ -58,18 +58,27 @@ public abstract class XformKafkaIT {
         if (null != kafka) {
             return;
         }
-        lake = new OffsetsLake();
+        lake = new StubLake();
         Testcontainers.exposeHostPorts(lake.port());
+        String lakeUrl = "http://host.testcontainers.internal:" + lake.port();
         XformKafkaContainer container = new XformKafkaContainer()
-            .withOffsetsUri("http://host.testcontainers.internal:" + lake.port() + "/offsets");
+            .withTransformerConfig("content-lake", "uri", lakeUrl + "/lake")
+            .withTransformerConfig("content-lake-offsets", "offsets.uri", lakeUrl + "/offsets");
         container.start();
         kafka = container;
         admin = Admin.create(Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers()));
     }
 
     protected String createTopic() throws Exception {
-        String topic = "it-" + getClass().getSimpleName() + "-" + testName.getMethodName();
-        admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1))).all().get(30, SECONDS);
+        return createTopic(1);
+    }
+
+    protected String createTopic(int partitions) throws Exception {
+        return createTopic("it-" + getClass().getSimpleName() + "-" + testName.getMethodName(), partitions);
+    }
+
+    protected static String createTopic(String topic, int partitions) throws Exception {
+        admin.createTopics(List.of(new NewTopic(topic, partitions, (short) 1))).all().get(30, SECONDS);
         return topic;
     }
 
@@ -84,8 +93,12 @@ public abstract class XformKafkaIT {
         return new KafkaProducer<>(props);
     }
 
-    // Reads partition 0 up to its end offset, which for read_committed is the last stable offset.
     protected static List<ConsumerRecord<String, String>> consumeAll(String topic, String isolationLevel) {
+        return consumeAll(topic, 0, isolationLevel);
+    }
+
+    // Reads the partition up to its end offset, which for read_committed is the last stable offset.
+    protected static List<ConsumerRecord<String, String>> consumeAll(String topic, int partitionIndex, String isolationLevel) {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
@@ -93,7 +106,7 @@ public abstract class XformKafkaIT {
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, isolationLevel);
 
-        TopicPartition partition = new TopicPartition(topic, 0);
+        TopicPartition partition = new TopicPartition(topic, partitionIndex);
         List<ConsumerRecord<String, String>> records = new ArrayList<>();
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
             consumer.assign(List.of(partition));

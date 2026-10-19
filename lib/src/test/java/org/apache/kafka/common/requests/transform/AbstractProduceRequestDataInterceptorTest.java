@@ -256,6 +256,21 @@ public class AbstractProduceRequestDataInterceptorTest {
         assertFalse(result.hasErrors());
     }
 
+    @Test
+    public void partitionEmptiedByDlqIsReportedDoneWithoutWrite() {
+        String t = topic("t");
+        String dlq = topic("dlq");
+
+        InterceptResult result = dlqForKeys(dlq, "k0", "k1").intercept(request()
+            .add(t, 0, plain(record("k0", "v0"), record("k1", "v1")))
+            .add(t, 1, plain(record("k2", "v2")))
+            .build(), VERSION);
+
+        assertEquals(Map.of(new TopicPartition(t, 0), Errors.NONE), result.partitionErrors());
+        assertEquals(List.of("k0", "k1"), keys(records(result.data(), dlq, 0)));
+        assertEquals(List.of("k2"), keys(records(result.data(), t, 1)));
+    }
+
     // Idempotent batches can't have sequence gaps, so the routed record also keeps its slot in the original topic.
     @Test
     public void dlqRecordKeepsItsSlotInIdempotentBatch() {
