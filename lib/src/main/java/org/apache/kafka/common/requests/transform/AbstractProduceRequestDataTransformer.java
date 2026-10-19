@@ -117,7 +117,10 @@ public abstract class AbstractProduceRequestDataTransformer extends AbstractTran
                             log.debug("{}: routing record to DLQ topic: {}", transformerName, dlqTopic);
                             Record dlqRecord = removeDlqHeader(recordBatch, transformedRecord, dlqTopicHeader);
                             MemoryRecordsBuilder dlqBuilder = getDlqBuilder(dlqBuilders, dlqTopic, partitionProduceData.index(), memoryRecords.sizeInBytes());
-                            dlqBuilder.append(dlqRecord);
+                            // Use timestamp-based append which auto-assigns sequential offsets.
+                            // Don't use append(Record) - it reuses record.offset() which causes conflicts
+                            // when records from different batches (both with offset 0) go to the same DLQ partition.
+                            dlqBuilder.append(dlqRecord.timestamp(), dlqRecord.key(), dlqRecord.value(), dlqRecord.headers());
 
                             // Idempotent batches can't have gaps in their sequence numbers, so the record also keeps its slot in the original topic.
                             if (recordBatch.hasProducerId()) {
