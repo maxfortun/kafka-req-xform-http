@@ -248,24 +248,22 @@ public abstract class AbstractTransformer {
 
     protected Record newRecord(RecordBatch recordBatch, Record record, Header[] headers, ByteBuffer body) throws IOException {
         ByteBufferOutputStream out = new ByteBufferOutputStream(1024);
+        // Zero timestamp delta over the record's own timestamp; a delta over NO_TIMESTAMP (-1) shifts it by 1ms.
         DefaultRecord.writeTo(
             new DataOutputStream(out),
             (int)record.offset(),
-            record.timestamp(),
+            0L,
             record.key(),
             body,
             headers
         );
         ByteBuffer buffer = out.buffer();
         buffer.flip();
-        
-        long timestamp = recordBatch.timestampType() == TimestampType.LOG_APPEND_TIME ?
-            recordBatch.maxTimestamp() : RecordBatch.NO_TIMESTAMP;
 
         DefaultRecord newRecord = DefaultRecord.readFrom(
             buffer,
             recordBatch.baseOffset(),
-            timestamp,
+            record.timestamp(),
             recordBatch.baseSequence(),
             null
         );

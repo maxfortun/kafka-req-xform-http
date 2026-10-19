@@ -147,7 +147,7 @@ public class HttpProduceRequestDataTransformer extends AbstractProduceRequestDat
 					if (dlqTopic == null || dlqTopic.isEmpty()) {
 						dlqTopic = "__{topic-name}-dlq";
 					}
-					dlqTopic = dlqTopic.replaceAll("{topic-name}", topicProduceData.name());
+					dlqTopic = dlqTopic.replace("{topic-name}", topicProduceData.name());
 
 					recordHeaders.remove(headerPrefix + "dlq-topic");
 					recordHeaders.add(headerPrefix + "dlq-topic", dlqTopic.getBytes(StandardCharsets.UTF_8));
