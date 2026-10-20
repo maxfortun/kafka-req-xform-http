@@ -1,0 +1,110 @@
+# Performance comparison: the same broker image with and without the content lake interceptor.
+# broker  - the broker under test (fork + plugin). INTERCEPTOR picks plain (default) or lake.
+# kafka   - a separate broker for the lake's own checked_in events, so they don't load the broker under test.
+# redis, mongo, api, cache - the content lake, as in content-lake-api and content-lake-cache.
+# perf    - runs kafka-producer-perf-test.sh.
+name: content-lake-perf
+
+services:
+  broker:
+    build:
+      context: .
+      dockerfile: broker/Dockerfile
+    image: content-lake-perf-broker:local
+    environment:
+      KAFKA_PRODUCE_REQUEST_INTERCEPTOR: ${INTERCEPTOR:-org.apache.kafka.common.requests.DefaultProduceRequestInterceptor}
+      KAFKA_HEAP_OPTS: "-Xms1g -Xmx1g"
+    # Bounds the broker's page cache, so a throttled disk binds once the run outgrows memory.
+    mem_limit: ${BROKER_MEM:-3g}
+    volumes:
+      - broker-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 5s
+      timeout: 15s
+      retries: 30
+
+  kafka:
+    image: apache/kafka:3.7.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 5s
+      timeout: 15s
+      retries: 30
+
+  kafka-topics:
+    image: apache/kafka:3.7.0
+    depends_on:
+      kafka: { condition: service_healthy }
+    entrypoint: ["/bin/bash", "-c", "for t in content-lake.checked-in content-lake.persisted content-lake.dead-letter; do /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic $$t --partitions 12; done"]
+    restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    # Memory only, as in the lake's request path: durability comes from the cache worker.
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  mongo:
+    image: mongo:7
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 3s
+      retries: 30
+
+  api:
+    build:
+      context: ../../content-lake-api
+      additional_contexts:
+        lib: ../../content-lake-lib
+    image: content-lake-api:local
+    environment:
+      CL_CONFIG_FILE: /app/content-lake-api/config/docker.yaml
+      LOG_LEVEL: warn
+    volumes:
+      - content:/data/content
+    depends_on:
+      redis: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+      kafka-topics: { condition: service_completed_successfully }
+
+  cache:
+    build:
+      context: ../../content-lake-cache
+      additional_contexts:
+        lib: ../../content-lake-lib
+    image: content-lake-cache:local
+    environment:
+      CL_CONFIG_FILE: /app/content-lake-cache/config/docker.yaml
+      LOG_LEVEL: warn
+    volumes:
+      - content:/data/content
+    depends_on:
+      redis: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+      kafka-topics: { condition: service_completed_successfully }
+
+  perf:
+    image: apache/kafka:3.7.2
+    entrypoint: ["sleep", "infinity"]
+    environment:
+      KAFKA_HEAP_OPTS: "-Xmx1g"
+
+volumes:
+  broker-data:
+  content:

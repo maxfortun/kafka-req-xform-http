@@ -1,0 +1,8 @@
+# Caps the broker's disk writes. The lake's content volume stays unthrottled, standing in for S3.
+# /dev/vda is Docker Desktop's VM disk; set BROKER_DISK for other hosts.
+services:
+  broker:
+    blkio_config:
+      device_write_bps:
+        - path: ${BROKER_DISK:-/dev/vda}
+          rate: ${BROKER_WRITE_BPS:-50mb}
