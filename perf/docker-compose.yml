@@ -13,7 +13,7 @@ services:
     image: content-lake-perf-broker:local
     environment:
       KAFKA_PRODUCE_REQUEST_INTERCEPTOR: ${INTERCEPTOR:-org.apache.kafka.common.requests.DefaultProduceRequestInterceptor}
-      KAFKA_HEAP_OPTS: "-Xms1g -Xmx1g"
+      KAFKA_HEAP_OPTS: "-Xms${BROKER_HEAP:-1g} -Xmx${BROKER_HEAP:-1g}"
     # Bounds the broker's page cache, so a throttled disk binds once the run outgrows memory.
     mem_limit: ${BROKER_MEM:-3g}
     volumes:
@@ -75,6 +75,7 @@ services:
     image: content-lake-api:local
     environment:
       CL_CONFIG_FILE: /app/content-lake-api/config/docker.yaml
+      CL__SERVER__BODY_LIMIT_BYTES: ${API_BODY_LIMIT:-1200000000}
       LOG_LEVEL: warn
     volumes:
       - content:/data/content
@@ -103,7 +104,7 @@ services:
     image: apache/kafka:3.7.2
     entrypoint: ["sleep", "infinity"]
     environment:
-      KAFKA_HEAP_OPTS: "-Xmx1g"
+      KAFKA_HEAP_OPTS: "-Xmx${PERF_HEAP:-1g}"
 
 volumes:
   broker-data:

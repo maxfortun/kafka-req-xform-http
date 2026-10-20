@@ -26,6 +26,36 @@ DLQ routing needs a fork build that only answers for the partitions a client sen
 Override the base image with `-PkafkaBaseImage=apache/kafka:3.7.2`. The image's files are in
 `lib/src/integrationTest/resources/docker`. Broker logs are printed when a test fails.
 
+### Performance: Kafka with and without the content lake
+[`perf/`](perf/README.md) compares the same broker with and without the content-lake interceptor, at 100 KB to 1 GB
+records, with the broker's disk unthrottled and capped at 50 MB/s. With the lake, the broker logs only a claim check
+(the lake's record id and URLs) and the content goes to the lake's Redis tier, persisted to Mongo and disk afterwards.
+
+| record | plain, disk capped | lake, disk capped | plain, uncapped | lake, uncapped |
+|---|---|---|---|---|
+| 100 KB | 60 MB/s | 57 MB/s | 588 MB/s | 56 MB/s |
+| 1 MB | 59 MB/s | 290 MB/s | 579 MB/s | 282 MB/s |
+| 4 MB | 56 MB/s | 384 MB/s | 432 MB/s | 382 MB/s |
+| 100 MB | 57 MB/s | 119 MB/s | 157 MB/s | 130 MB/s |
+| 1 GB | 17 MB/s | 18 MB/s | 18 MB/s | 17 MB/s |
+
+- **When the broker disk is the bottleneck, the lake raises throughput 2-7x for 1-100 MB records**, and broker disk
+  writes drop from about 3 GB per run to almost nothing. Durable throughput depends on enough cache workers to keep up
+  (4 workers persisted 217-296 MB/s).
+- **Small records and brokers with spare disk bandwidth are faster without it**: the plugin makes one synchronous HTTP
+  call per record.
+- **1 GB records are slow through Kafka on both paths** (about 18 MB/s per producer); uploading them straight to the
+  lake runs at 276-458 MB/s, so very large files are better checked in by the producer, with only the claim check on
+  Kafka.
+- **Projected cost** at 1 GB/s of 1 MB records, 7 days retention, replication 3: plain Kafka about $491k/month, Kafka
+  with tiered storage $234k, the lake $226k, or $155k with its traffic kept in one AZ. See
+  [`perf/project.py`](perf/project.py) to project your own ingest, record size, retention and prices.
+
+```
+cd perf && ./prepare.sh && ./run.sh
+python3 project.py --ingest-mb-s 1000 --record-mb 1
+```
+
 ### Request Headers
 All headers have a prefix of `plugin prefix`-`broker`-, configurable with `headers.prefix`.
 

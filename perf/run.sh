@@ -3,6 +3,7 @@
 #   ./prepare.sh && ./run.sh
 # Env: SIZES (bytes), TOTAL_MB per run, PRODUCERS (parallel perf-test processes), PARTITIONS, SCENARIOS, CACHE_REPLICAS,
 #      BROKER_WRITE_BPS for the throttled scenarios (default 50mb).
+#      For records of 100MB and up: PRODUCERS=1 BROKER_HEAP=4g BROKER_MEM=6g PERF_HEAP=3g BUFFER_MEMORY=2200000000.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -35,6 +36,23 @@ for line in sys.stdin:
 print(json.dumps(snapshot))'
 }
 
+# CPU seconds used per service so far (cgroup usage_usec, summed over replicas).
+cpu_snapshot() {
+	python3 -c '
+import json, subprocess
+names = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True).stdout.split()
+snapshot = {}
+for name in names:
+    if not name.startswith("content-lake-perf-"):
+        continue
+    stat = subprocess.run(["docker", "exec", name, "cat", "/sys/fs/cgroup/cpu.stat"], capture_output=True, text=True).stdout
+    for line in stat.splitlines():
+        if line.startswith("usage_usec"):
+            service = name.removeprefix("content-lake-perf-").rsplit("-", 1)[0]
+            snapshot[service] = snapshot.get(service, 0) + int(line.split()[1]) / 1e6
+print(json.dumps(snapshot))'
+}
+
 files_for() {
 	if [[ $1 == *throttled ]]; then echo "-f docker-compose.yml -f throttle.yml"; else echo "-f docker-compose.yml"; fi
 }
@@ -59,12 +77,13 @@ for scenario in $SCENARIOS; do
 		total=$(( records * PRODUCERS ))
 
 		io_before=$(io_snapshot)
+		cpu_before=$(cpu_snapshot)
 		started=$(now_ms)
 		dc exec -T perf bash -c "
 			for i in \$(seq $PRODUCERS); do
 				/opt/kafka/bin/kafka-producer-perf-test.sh --topic $topic --num-records $records --record-size $size --throughput -1 \
-					--producer-props bootstrap.servers=broker:9092 acks=all linger.ms=5 batch.size=1048576 max.request.size=20971520 \
-					buffer.memory=268435456 compression.type=none request.timeout.ms=120000 delivery.timeout.ms=900000 \
+					--producer-props bootstrap.servers=broker:9092 acks=all linger.ms=5 batch.size=1048576 max.request.size=1100000000 \
+					buffer.memory=${BUFFER_MEMORY:-268435456} compression.type=none request.timeout.ms=120000 delivery.timeout.ms=900000 \
 					> /tmp/producer.\$i.log 2>&1 &
 			done
 			wait
@@ -84,9 +103,11 @@ for scenario in $SCENARIOS; do
 			redis_peak=$(dc exec -T redis redis-cli info memory | tr -d '\r' | awk -F: '$1=="used_memory_peak"{print $2}')
 		fi
 		# Flush page caches so block I/O counts the bytes that actually reach the disk.
-		dc exec -T broker sync
-		dc exec -T cache sync
+		dc exec -T broker sync 2>/dev/null || true
+		dc exec -T cache sync 2>/dev/null || true
+		broker_oom=$(docker inspect content-lake-perf-broker-1 --format '{{.State.OOMKilled}}' 2>/dev/null || echo false)
 		io_after=$(io_snapshot)
+		cpu_after=$(cpu_snapshot)
 
 		python3 - "$out/$scenario-$size.producers.log" > "$out/$scenario-$size.json" <<PY
 import json, re, sys
@@ -96,17 +117,21 @@ p99 = max(float(re.search(r'([\d.]+) ms 99th', line).group(1)) for line in lines
 avg = sum(float(re.search(r'([\d.]+) ms avg latency', line).group(1)) for line in lines) / len(lines) if lines else None
 before, after = json.loads('''$io_before'''), json.loads('''$io_after''')
 written = {name: after.get(name, 0) - before.get(name, 0) for name in after}
+cpu_before, cpu_after = json.loads('''$cpu_before'''), json.loads('''$cpu_after''')
+cpu = {name: round(cpu_after[name] - cpu_before.get(name, 0), 1) for name in cpu_after}
 elapsed = ($produced - $started) / 1000
 payload_mb = $total * $size / 1e6
 persisted = $persisted
 print(json.dumps({
-    "scenario": "$scenario", "cache_replicas": $CACHE_REPLICAS, "record_bytes": $size, "records": $total, "producers": $PRODUCERS, "payload_mb": round(payload_mb, 1),
+    "scenario": "$scenario", "cache_replicas": $CACHE_REPLICAS, "broker_oom_killed": "$broker_oom" == "true", "record_bytes": $size, "records": $total, "producers": $PRODUCERS, "payload_mb": round(payload_mb, 1),
     "producers_reporting": len(lines), "produce_sec": round(elapsed, 1), "produce_mb_per_sec": round(payload_mb / elapsed, 1),
     "producer_reported_mb_per_sec": round(sum_mb, 1), "avg_latency_ms": avg, "max_p99_latency_ms": p99,
     "persist_sec": round((persisted - $started) / 1000, 1) if persisted else None,
     "persisted_mb_per_sec": round(payload_mb / ((persisted - $started) / 1000), 1) if persisted else None,
     "redis_peak_mb": round(int("$redis_peak") / 1e6) if "$redis_peak" else None,
-    "written_mb": {name: round(value / 1e6) for name, value in sorted(written.items()) if value > 1e6}
+    "written_mb": {name: round(value / 1e6) for name, value in sorted(written.items()) if value > 1e6},
+    "cpu_sec": dict(sorted(cpu.items())),
+    "cpu_sec_per_gb": {name: round(value / (payload_mb / 1000), 1) for name, value in sorted(cpu.items()) if name != "perf"}
 }))
 PY
 		cat "$out/$scenario-$size.json"
