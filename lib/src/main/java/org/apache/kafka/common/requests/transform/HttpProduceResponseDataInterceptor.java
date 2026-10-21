@@ -215,6 +215,19 @@ public class HttpProduceResponseDataInterceptor extends AbstractTransformer impl
             httpRequest.header("Content-Type", "application/json");
             httpRequest.header(headerPrefix + "hostname", brokerHostname);
             httpRequest.header(headerPrefix + "batch-size", String.valueOf(batch.size()));
+
+            String httpHeadersString = appConfig("headers.http");
+            if (null != httpHeadersString) {
+                for (String httpHeaderString : httpHeadersString.split("[,\\s]+")) {
+                    try {
+                        String[] tokens = httpHeaderString.split("\\s*=\\s*");
+                        httpRequest.header(tokens[0], tokens[1]);
+                    } catch (Exception e) {
+                        log.warn("{}: failed to parse header: {}", transformerName, httpHeaderString, e);
+                    }
+                }
+            }
+
             httpRequest.body(null, java.nio.ByteBuffer.wrap(json.toString().getBytes(StandardCharsets.UTF_8)));
 
             HttpResponse httpResponse = httpClient.send(httpRequest);

@@ -123,6 +123,21 @@ public class HttpProduceResponseDataInterceptorTest {
     }
 
     @Test
+    public void sendsConfiguredHttpHeaders() throws Exception {
+        config.set("headers.http", "cl-brk-id=int-vir-blue, x-extra=1");
+        HttpProduceResponseDataInterceptor interceptor = interceptor();
+        TopicPartition tp = new TopicPartition(topic, 0);
+        ProduceRequestData data = requestData("h");
+        stash(data, tp, stashed("k", "uid", "u"));
+
+        interceptor.onAppend(data, Map.of(tp, ok(0L)), VERSION);
+
+        StubHttpServer.Request request = lake.awaitRequests(1, TIMEOUT).get(0);
+        assertEquals("int-vir-blue", request.header("cl-brk-id"));
+        assertEquals("1", request.header("x-extra"));
+    }
+
+    @Test
     public void popsTheStash() throws Exception {
         HttpProduceResponseDataInterceptor interceptor = interceptor();
         TopicPartition tp = new TopicPartition(topic, 0);
