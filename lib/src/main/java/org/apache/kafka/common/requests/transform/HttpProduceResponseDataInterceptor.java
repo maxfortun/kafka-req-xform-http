@@ -36,6 +36,9 @@ import org.slf4j.LoggerFactory;
 /**
  * HTTP interceptor for produce responses. Sends offset information to an external service
  * after records have been written to the log.
+ *
+ * Records are posted in batches: a batch is sent once it holds {@code offsets.batchSize} records, or once no
+ * record has arrived for {@code offsets.batchIntervalMs}.
  */
 public class HttpProduceResponseDataInterceptor extends AbstractTransformer implements ProduceResponseDataInterceptor {
     private static final Logger log = LoggerFactory.getLogger(HttpProduceResponseDataInterceptor.class);
@@ -56,8 +59,8 @@ public class HttpProduceResponseDataInterceptor extends AbstractTransformer impl
         super(transformerName);
 
         this.offsetsUri = appConfig("offsets.uri");
-        this.batchIntervalMs = Long.parseLong(appConfig("offsets.batchIntervalMs", "1000"));
-        this.batchSize = Integer.parseInt(appConfig("offsets.batchSize", "100"));
+        this.batchIntervalMs = Long.parseLong(appConfig("offsets.batchIntervalMs", "60000"));
+        this.batchSize = Integer.parseInt(appConfig("offsets.batchSize", "200"));
         this.enabled = offsetsUri != null && !offsetsUri.isBlank();
 
         if (enabled) {
@@ -134,31 +137,39 @@ public class HttpProduceResponseDataInterceptor extends AbstractTransformer impl
 
         while (running) {
             try {
-                // Wait for first record or timeout
+                // A batch starts with its first record
                 OffsetRecord first = pendingRecords.poll(batchIntervalMs, TimeUnit.MILLISECONDS);
                 if (first == null) {
                     continue;
                 }
-
-                batch.clear();
                 batch.add(first);
 
-                // Drain up to batchSize more records
-                pendingRecords.drainTo(batch, batchSize - 1);
+                // and grows until it's full, or until no record has arrived for a whole batchIntervalMs
+                while (batch.size() < batchSize) {
+                    pendingRecords.drainTo(batch, batchSize - batch.size());
+                    if (batch.size() >= batchSize) {
+                        break;
+                    }
+                    OffsetRecord next = pendingRecords.poll(batchIntervalMs, TimeUnit.MILLISECONDS);
+                    if (next == null) {
+                        break;
+                    }
+                    batch.add(next);
+                }
 
-                // Send the batch
                 sendBatch(batch);
+                batch.clear();
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
                 log.error("{}: error in sender loop", transformerName, e);
+                batch.clear();
             }
         }
 
-        // Drain remaining records on shutdown
-        batch.clear();
+        // On shutdown, the batch being collected goes out with whatever is still queued
         pendingRecords.drainTo(batch);
         if (!batch.isEmpty()) {
             try {

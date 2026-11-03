@@ -231,6 +231,58 @@ public class HttpProduceResponseDataInterceptorTest {
     }
 
     @Test
+    public void aBatchWaitsForAWholeIntervalWithoutRecords() throws Exception {
+        config.set("offsets.batchIntervalMs", "400");
+        HttpProduceResponseDataInterceptor interceptor = interceptor();
+        TopicPartition tp = new TopicPartition(topic, 0);
+        for (int i = 0; i < 3; i++) {
+            ProduceRequestData data = requestData("r" + i);
+            stash(data, tp, stashed("k" + i));
+            interceptor.onAppend(data, Map.of(tp, ok(i)), VERSION);
+            Thread.sleep(150); // less than the interval: the batch keeps growing
+        }
+        assertEquals(0, lake.requests().size());
+
+        List<StubHttpServer.Request> requests = lake.awaitRequests(1, TIMEOUT);
+        assertEquals(1, requests.size());
+        assertEquals(3, offsets(requests).size());
+    }
+
+    @Test
+    public void aFullBatchIsSentWithoutWaiting() throws Exception {
+        config.set("offsets.batchIntervalMs", "60000").set("offsets.batchSize", "2");
+        HttpProduceResponseDataInterceptor interceptor = interceptor();
+        TopicPartition tp = new TopicPartition(topic, 0);
+        ProduceRequestData data = requestData("a");
+        stash(data, tp, stashed("k0"), stashed("k1"), stashed("k2"));
+
+        interceptor.onAppend(data, Map.of(tp, ok(0L)), VERSION);
+
+        List<StubHttpServer.Request> requests = lake.awaitRequests(1, TIMEOUT);
+        assertEquals(2, offsets(requests.subList(0, 1)).size());
+        Thread.sleep(200);
+        assertEquals(1, lake.requests().size()); // k2 waits for the interval
+    }
+
+    @Test
+    public void shutdownSendsTheBatchBeingCollected() throws Exception {
+        config.set("offsets.batchIntervalMs", "60000");
+        HttpProduceResponseDataInterceptor interceptor = interceptor();
+        TopicPartition tp = new TopicPartition(topic, 0);
+        ProduceRequestData first = requestData("a");
+        ProduceRequestData second = requestData("b");
+        stash(first, tp, stashed("k0"));
+        stash(second, tp, stashed("k1"));
+        interceptor.onAppend(first, Map.of(tp, ok(0L)), VERSION);
+        Thread.sleep(100); // k0 is in the batch, waiting for more
+        interceptor.onAppend(second, Map.of(tp, ok(1L)), VERSION);
+
+        interceptor.shutdown();
+
+        assertEquals(2, offsets(lake.awaitRequests(1, TIMEOUT)).size());
+    }
+
+    @Test
     public void lakeErrorsDoNotStopLaterPosts() throws Exception {
         lake.respond(request -> new StubHttpServer.Response(500, "down"));
         HttpProduceResponseDataInterceptor interceptor = interceptor();
